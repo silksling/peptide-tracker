@@ -2,8 +2,14 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Peptide Tracker</title>
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Peptide Tracker">
+  <meta name="theme-color" content="#0f1117">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icon-180.png">
   <style>
 * {
   margin: 0;
@@ -38,7 +44,7 @@ body {
 #app {
   max-width: 640px;
   margin: 0 auto;
-  padding: 0 16px 80px;
+  padding: env(safe-area-inset-top, 0) 16px calc(80px + env(safe-area-inset-bottom, 0));
 }
 
 header {

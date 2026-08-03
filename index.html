@@ -1142,6 +1142,42 @@ nav {
   color: var(--text-muted);
   margin-top: 4px;
 }
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 24px;
+}
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.toggle-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: var(--border);
+  border-radius: 24px;
+  transition: 0.2s;
+}
+.toggle-slider::before {
+  content: "";
+  position: absolute;
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  bottom: 3px;
+  background: white;
+  border-radius: 50%;
+  transition: 0.2s;
+}
+.toggle-switch input:checked + .toggle-slider {
+  background: var(--accent);
+}
+.toggle-switch input:checked + .toggle-slider::before {
+  transform: translateX(20px);
+}
 
 @media (max-width: 480px) {
   .stats-row {
@@ -1480,19 +1516,55 @@ nav {
             <input type="number" id="calc-bac-custom" step="0.1" min="0.1" max="20" placeholder="Or enter custom (ml)">
           </div>
           <div class="form-group">
-            <label>Filter Loss</label>
-            <div class="calc-preset-grid" id="calc-filter" style="grid-template-columns: repeat(2, 1fr);">
-              <button class="calc-preset selected" data-val="0">None</button>
-              <button class="calc-preset" data-val="1">0.22μm Filter</button>
-            </div>
+            <label style="display:flex;align-items:center;justify-content:space-between;">
+              <span>PES Filter Loss</span>
+              <label class="toggle-switch" style="margin:0;">
+                <input type="checkbox" id="calc-filter-toggle">
+                <span class="toggle-slider"></span>
+              </label>
+            </label>
             <div id="filter-options" style="display:none;margin-top:8px;">
-              <label style="font-size:12px;color:var(--text-muted);">Dead volume lost in filter (ml)</label>
-              <div class="calc-preset-grid" id="calc-filter-loss">
-                <button class="calc-preset selected" data-val="0.05">0.05 ml</button>
-                <button class="calc-preset" data-val="0.1">0.1 ml</button>
-                <button class="calc-preset" data-val="0.15">0.15 ml</button>
+              <label style="font-size:12px;color:var(--text-muted);">Filter Diameter</label>
+              <div class="calc-preset-grid" id="calc-filter-diameter" style="grid-template-columns: repeat(4, 1fr);">
+                <button class="calc-preset" data-val="4" data-loss="0.05"><div>4mm</div><div style="font-size:10px;color:var(--text-muted);">Least loss</div></button>
+                <button class="calc-preset selected" data-val="13" data-loss="0.28"><div>13mm</div><div style="font-size:10px;color:var(--text-muted);">Popular</div></button>
+                <button class="calc-preset" data-val="25" data-loss="0.55"><div>25mm</div><div style="font-size:10px;color:var(--text-muted);"> </div></button>
+                <button class="calc-preset" data-val="33" data-loss="1.0"><div>33mm</div><div style="font-size:10px;color:var(--text-muted);"> </div></button>
               </div>
-              <input type="number" id="calc-filter-custom" step="0.01" min="0.01" max="1" placeholder="Or enter custom (ml)">
+              <p style="font-size:11px;color:var(--text-muted);margin:4px 0 12px;">Most common for peptide reconstitution (1-10mL).</p>
+              <label style="font-size:12px;color:var(--text-muted);">Membrane Micron Size</label>
+              <select id="calc-micron-size" style="width:100%;padding:10px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:14px;margin-top:4px;">
+                <option value="0.22" selected>0.22μm — Recommended (sterilization)</option>
+                <option value="0.45">0.45μm — Larger particles only</option>
+              </select>
+              <div style="margin-top:12px;padding:10px 12px;background:var(--bg);border-radius:8px;border:1px solid var(--border);">
+                <div style="font-size:12px;color:var(--text-muted);margin-bottom:4px;">Estimated Filter Loss</div>
+                <div style="display:flex;align-items:baseline;gap:4px;">
+                  <span style="font-size:20px;font-weight:700;color:var(--accent);" id="calc-filter-loss-display">0.28</span>
+                  <span style="font-size:14px;color:var(--text-muted);">ml</span>
+                </div>
+                <div style="font-size:11px;color:var(--text-muted);margin-top:2px;" id="calc-filter-loss-units">= 28 units on a 100-unit (1mL) syringe</div>
+              </div>
+              <div style="margin-top:12px;">
+                <label style="font-size:12px;color:var(--text-muted);">How to Handle Loss</label>
+                <label class="filter-radio" style="display:flex;align-items:flex-start;gap:8px;padding:10px 12px;background:var(--bg);border:2px solid var(--accent);border-radius:8px;margin-top:6px;cursor:pointer;">
+                  <input type="radio" name="filter-method" value="reduce" checked style="margin-top:3px;">
+                  <div>
+                    <div style="font-weight:600;font-size:13px;">Reduce usable volume</div>
+                    <div style="font-size:11px;color:var(--text-muted);">Fewer doses available, same water amount added</div>
+                  </div>
+                </label>
+                <label class="filter-radio" style="display:flex;align-items:flex-start;gap:8px;padding:10px 12px;background:var(--bg);border:2px solid var(--border);border-radius:8px;margin-top:6px;cursor:pointer;">
+                  <input type="radio" name="filter-method" value="extra" style="margin-top:3px;">
+                  <div>
+                    <div style="font-weight:600;font-size:13px;">Add extra water</div>
+                    <div style="font-size:11px;color:var(--text-muted);">Same dose count, slightly diluted concentration</div>
+                  </div>
+                </label>
+              </div>
+              <div id="filter-info" style="margin-top:8px;padding:8px 12px;background:rgba(108,99,255,0.1);border-radius:8px;border:1px solid var(--accent);font-size:12px;color:var(--text-muted);">
+                Usable volume after filtering: <strong id="filter-usable-vol" style="color:var(--text);">0.72 ml</strong> <span id="filter-losing-text">(losing 0.28ml in filter)</span>
+              </div>
             </div>
           </div>
           <div class="form-group" id="syringe-only-options" style="display:none;">
@@ -1503,8 +1575,26 @@ nav {
               <button class="calc-preset selected" data-val="100">1.0 ml (100u)</button>
             </div>
           </div>
+          <div id="pen-only-options" style="display:block;">
+            <div class="form-group">
+              <label>Pen Cartridge Capacity</label>
+              <div class="calc-preset-grid" id="calc-pen-capacity" style="grid-template-columns: repeat(3, 1fr);">
+                <button class="calc-preset" data-val="1.5">1.5 ml</button>
+                <button class="calc-preset selected" data-val="3">3.0 ml</button>
+                <button class="calc-preset" data-val="5">5.0 ml</button>
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Max Injection</label>
+              <div class="calc-preset-grid" id="calc-max-injection">
+                <button class="calc-preset selected" data-val="60"><div>60u Max</div></button>
+                <button class="calc-preset" data-val="80"><div>80u Max</div></button>
+                <button class="calc-preset" data-val="0"><div>No Limit</div></button>
+              </div>
+            </div>
+          </div>
           <div class="form-group">
-            <label>Desired Dose (mg)</label>
+            <label>Desired Dose (mg) <span id="calc-available-label" style="float:right;font-size:11px;color:var(--text-muted);font-weight:400;"></span></label>
             <div class="calc-preset-grid" id="calc-dose">
               <button class="calc-preset selected" data-val="2">2 mg</button>
               <button class="calc-preset" data-val="4">4 mg</button>
@@ -1547,6 +1637,38 @@ nav {
             <div class="calc-formula-item">
               <div class="calc-formula-label">Vial Remaining</div>
               <div class="calc-formula-value" id="calc-remaining">80%</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-card" id="cartridge-plan" style="margin-top:16px;">
+          <h2>Cartridge Plan</h2>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+            <span style="font-size:13px;color:var(--text-muted);">How many cartridges to fill?</span>
+            <div style="display:flex;align-items:center;gap:12px;">
+              <button class="btn-secondary" id="cart-minus" style="width:36px;height:36px;padding:0;font-size:18px;">−</button>
+              <span style="font-size:24px;font-weight:700;min-width:30px;text-align:center;" id="cart-count">1</span>
+              <button class="btn-secondary" id="cart-plus" style="width:36px;height:36px;padding:0;font-size:18px;">+</button>
+            </div>
+          </div>
+          <div id="cart-info" style="padding:8px 12px;background:rgba(108,99,255,0.1);border-radius:8px;border:1px solid var(--accent);font-size:12px;color:var(--text-muted);margin-bottom:12px;"></div>
+          <div id="cart-details"></div>
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:12px;padding:12px;background:var(--bg);border-radius:8px;">
+            <div style="text-align:center;">
+              <div style="font-size:20px;font-weight:700;color:var(--accent);" id="cart-total-count">1</div>
+              <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;">Cartridges</div>
+            </div>
+            <div style="text-align:center;">
+              <div style="font-size:20px;font-weight:700;color:var(--accent);" id="cart-ml-used">0</div>
+              <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;">mL Used</div>
+            </div>
+            <div style="text-align:center;">
+              <div style="font-size:20px;font-weight:700;color:var(--red);" id="cart-ml-left">0</div>
+              <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;">mL Leftover</div>
+            </div>
+            <div style="text-align:center;">
+              <div style="font-size:20px;font-weight:700;color:var(--accent);" id="cart-total-doses">0</div>
+              <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;">Total Doses</div>
             </div>
           </div>
         </div>
@@ -2778,7 +2900,7 @@ document.querySelectorAll('.levels-range').forEach(btn => {
 });
 
 // Reconstitution Calculator
-const calcState = { peptideAmt: 10, bacWater: 1, syringeUnits: 100, dose: 2, filterLoss: 0 };
+const calcState = { peptideAmt: 10, bacWater: 1, syringeUnits: 100, dose: 2, filterLoss: 0, filterMethod: 'reduce', useFilter: false, penCapacity: 3, maxInjection: 60, cartridgeCount: 1 };
 
 function setupCalcPresets(containerId, stateKey) {
   const container = document.getElementById(containerId);
@@ -2798,31 +2920,47 @@ setupCalcPresets('calc-peptide-amt', 'peptideAmt');
 setupCalcPresets('calc-bac-water', 'bacWater');
 setupCalcPresets('calc-syringe', 'syringeUnits');
 setupCalcPresets('calc-dose', 'dose');
-setupCalcPresets('calc-filter-loss', 'filterLoss');
 
-document.getElementById('calc-filter').querySelectorAll('.calc-preset').forEach(btn => {
+document.getElementById('calc-filter-toggle').addEventListener('change', e => {
+  calcState.useFilter = e.target.checked;
+  document.getElementById('filter-options').style.display = e.target.checked ? '' : 'none';
+  if (e.target.checked) {
+    const selectedDiam = document.querySelector('#calc-filter-diameter .calc-preset.selected');
+    calcState.filterLoss = parseFloat(selectedDiam.dataset.loss);
+  } else {
+    calcState.filterLoss = 0;
+  }
+  updateCalc();
+});
+
+document.getElementById('calc-filter-diameter').querySelectorAll('.calc-preset').forEach(btn => {
   btn.addEventListener('click', () => {
-    document.getElementById('calc-filter').querySelectorAll('.calc-preset').forEach(b => b.classList.remove('selected'));
+    document.getElementById('calc-filter-diameter').querySelectorAll('.calc-preset').forEach(b => b.classList.remove('selected'));
     btn.classList.add('selected');
-    const useFilter = btn.dataset.val === '1';
-    document.getElementById('filter-options').style.display = useFilter ? '' : 'none';
-    calcState.filterLoss = useFilter ? 0.05 : 0;
-    if (useFilter) {
-      document.getElementById('calc-filter-loss').querySelectorAll('.calc-preset').forEach(b => b.classList.remove('selected'));
-      document.getElementById('calc-filter-loss').querySelector('[data-val="0.05"]').classList.add('selected');
-    }
+    calcState.filterLoss = parseFloat(btn.dataset.loss);
     updateCalc();
   });
 });
 
-document.getElementById('calc-filter-custom').addEventListener('input', e => {
-  const val = parseFloat(e.target.value);
-  if (!isNaN(val) && val > 0) {
-    document.getElementById('calc-filter-loss').querySelectorAll('.calc-preset').forEach(b => b.classList.remove('selected'));
-    calcState.filterLoss = val;
+document.querySelectorAll('input[name="filter-method"]').forEach(radio => {
+  radio.addEventListener('change', e => {
+    calcState.filterMethod = e.target.value;
+    document.querySelectorAll('.filter-radio').forEach(label => {
+      label.style.borderColor = label.querySelector('input').checked ? 'var(--accent)' : 'var(--border)';
+    });
     updateCalc();
-  }
+  });
 });
+
+function updateFilterDisplay() {
+  const loss = calcState.filterLoss;
+  document.getElementById('calc-filter-loss-display').textContent = loss.toFixed(2);
+  const lossUnits = Math.round(loss * 100);
+  document.getElementById('calc-filter-loss-units').textContent = `= ${lossUnits} units on a 100-unit (1mL) syringe`;
+  const usable = Math.max(0, calcState.bacWater - loss);
+  document.getElementById('filter-usable-vol').textContent = usable.toFixed(2) + ' ml';
+  document.getElementById('filter-losing-text').textContent = `(losing ${loss.toFixed(2)}ml in filter)`;
+}
 
 document.getElementById('calc-peptide-custom').addEventListener('input', e => {
   const val = parseFloat(e.target.value);
@@ -2852,10 +2990,20 @@ document.getElementById('calc-dose-custom').addEventListener('input', e => {
 });
 
 function updateCalc() {
-  const { peptideAmt, bacWater, syringeUnits, dose, filterLoss } = calcState;
-  const effectiveVolume = bacWater - filterLoss;
-  const lostMg = filterLoss > 0 ? (filterLoss / bacWater) * peptideAmt : 0;
-  const effectivePeptide = peptideAmt - lostMg;
+  const { peptideAmt, bacWater, syringeUnits, dose, filterLoss, filterMethod } = calcState;
+
+  let effectiveVolume, effectivePeptide, totalWater;
+  if (filterLoss > 0 && filterMethod === 'extra') {
+    totalWater = bacWater + filterLoss;
+    effectiveVolume = bacWater;
+    effectivePeptide = peptideAmt;
+  } else {
+    totalWater = bacWater;
+    effectiveVolume = bacWater - filterLoss;
+    const lostMg = filterLoss > 0 ? (filterLoss / bacWater) * peptideAmt : 0;
+    effectivePeptide = peptideAmt - lostMg;
+  }
+
   const concentration = effectivePeptide / effectiveVolume;
   const volumeToDrawMl = dose / concentration;
   const syringeMl = syringeUnits / 100;
@@ -2864,8 +3012,11 @@ function updateCalc() {
   const pctUsed = (volumeToDrawMl / effectiveVolume) * 100;
   const pctRemaining = Math.max(0, 100 - pctUsed);
 
+  if (calcState.useFilter) updateFilterDisplay();
+
   const filterNote = document.getElementById('calc-filter-note');
   if (filterLoss > 0) {
+    const lostMg = filterLoss > 0 ? (filterLoss / totalWater) * peptideAmt : 0;
     if (!filterNote) {
       const note = document.createElement('div');
       note.id = 'calc-filter-note';
@@ -2873,7 +3024,7 @@ function updateCalc() {
       note.innerHTML = '<div class="calc-formula-label">Filter Loss</div><div class="calc-formula-value" style="color:var(--red);" id="calc-filter-val"></div>';
       document.getElementById('calc-formula').appendChild(note);
     }
-    document.getElementById('calc-filter-val').textContent = `-${lostMg.toFixed(2)} mg (${filterLoss} ml)`;
+    document.getElementById('calc-filter-val').textContent = `-${lostMg.toFixed(2)} mg (${filterLoss.toFixed(2)} ml)`;
   } else if (filterNote) {
     filterNote.remove();
   }
@@ -2882,10 +3033,20 @@ function updateCalc() {
 
   const isPen = calcState.device === 'pen';
 
+  const maxInj = calcState.maxInjection;
+  const exceedsMax = isPen && maxInj > 0 && unitsToDraw > maxInj;
+
+  document.getElementById('calc-available-label').textContent = isPen ? `of ${effectivePeptide.toFixed(1)}mg available` : '';
+
   if (isPen) {
-    document.getElementById('calc-units').innerHTML = `${unitsToDraw}<span>u</span>`;
-    document.getElementById('calc-instruction').textContent = `Dial pen to ${unitsToDraw}u`;
+    document.getElementById('calc-units').innerHTML = exceedsMax
+      ? `${unitsToDraw}<span>u</span>`
+      : `${unitsToDraw}<span>u</span>`;
+    document.getElementById('calc-instruction').textContent = exceedsMax
+      ? `Exceeds pen max (${maxInj}u) — split into ${Math.ceil(unitsToDraw / maxInj)} injections`
+      : `Dial pen to ${unitsToDraw}u`;
     document.getElementById('calc-dose-label').textContent = `That's your ${dose.toFixed(2)}mg dose · ${dosesPerVial} doses per vial`;
+    document.getElementById('calc-result').style.borderColor = exceedsMax ? 'var(--red)' : 'var(--green)';
   } else {
     document.getElementById('calc-units').innerHTML = tooLarge
       ? `--<span>u</span>`
@@ -2921,6 +3082,8 @@ function updateCalc() {
     syringeViz.querySelector('div:first-child').textContent = `Syringe (${syringeUnits}u)`;
     document.getElementById('calc-result').style.borderColor = tooLarge ? 'var(--red)' : 'var(--green)';
   }
+
+  if (isPen && typeof updateCartridgePlan === 'function') updateCartridgePlan();
 }
 
 // Device toggle
@@ -2930,12 +3093,97 @@ document.getElementById('calc-device').querySelectorAll('.calc-preset').forEach(
     document.getElementById('calc-device').querySelectorAll('.calc-preset').forEach(b => b.classList.remove('selected'));
     btn.classList.add('selected');
     calcState.device = btn.dataset.val;
-    document.getElementById('syringe-only-options').style.display = calcState.device === 'syringe' ? 'block' : 'none';
+    const isSyringe = calcState.device === 'syringe';
+    document.getElementById('syringe-only-options').style.display = isSyringe ? 'block' : 'none';
+    document.getElementById('pen-only-options').style.display = isSyringe ? 'none' : 'block';
+    document.getElementById('cartridge-plan').style.display = isSyringe ? 'none' : '';
     updateCalc();
   });
 });
 
+setupCalcPresets('calc-pen-capacity', 'penCapacity');
+
+document.getElementById('calc-max-injection').querySelectorAll('.calc-preset').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.getElementById('calc-max-injection').querySelectorAll('.calc-preset').forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
+    calcState.maxInjection = parseInt(btn.dataset.val);
+    updateCalc();
+  });
+});
+
+document.getElementById('cart-minus').addEventListener('click', () => {
+  if (calcState.cartridgeCount > 1) { calcState.cartridgeCount--; updateCartridgePlan(); }
+});
+document.getElementById('cart-plus').addEventListener('click', () => {
+  calcState.cartridgeCount++; updateCartridgePlan();
+});
+
+function updateCartridgePlan() {
+  const { peptideAmt, bacWater, filterLoss, filterMethod, penCapacity, dose } = calcState;
+  let effectiveVol;
+  if (filterLoss > 0 && filterMethod === 'extra') {
+    effectiveVol = bacWater;
+  } else {
+    effectiveVol = bacWater - filterLoss;
+  }
+  const concentration = (filterLoss > 0 && filterMethod === 'extra') ? peptideAmt / bacWater : (peptideAmt - (filterLoss / bacWater) * peptideAmt) / effectiveVol;
+  const maxCarts = Math.ceil(effectiveVol / penCapacity);
+  const count = Math.min(calcState.cartridgeCount, maxCarts);
+  calcState.cartridgeCount = Math.max(1, count);
+
+  document.getElementById('cart-count').textContent = calcState.cartridgeCount;
+
+  const mlPerCart = Math.min(penCapacity, effectiveVol / calcState.cartridgeCount);
+  const totalUsed = mlPerCart * calcState.cartridgeCount;
+  const leftover = Math.max(0, effectiveVol - totalUsed);
+  const isPartial = effectiveVol < penCapacity * calcState.cartridgeCount;
+
+  let infoText = '';
+  if (effectiveVol <= penCapacity) {
+    infoText = `Only enough for 1 partial cartridge (${effectiveVol.toFixed(1)} mL).`;
+  } else if (isPartial) {
+    infoText = `Last cartridge will be partial.`;
+  } else {
+    infoText = `${calcState.cartridgeCount} full cartridges.`;
+  }
+  infoText += ` You have <strong>${effectiveVol.toFixed(1)} mL</strong> of solution containing <strong>${(concentration * effectiveVol).toFixed(1)} mg</strong> of peptide (${concentration.toFixed(2)} mg/mL).`;
+  document.getElementById('cart-info').innerHTML = infoText;
+
+  let detailsHtml = '';
+  let remainingVol = effectiveVol;
+  let totalDoses = 0;
+  for (let i = 0; i < calcState.cartridgeCount; i++) {
+    const thisVol = Math.min(penCapacity, remainingVol);
+    remainingVol -= thisVol;
+    const thisMg = thisVol * concentration;
+    const thisDoses = Math.floor(thisMg / dose);
+    totalDoses += thisDoses;
+    const pct = (thisVol / penCapacity) * 100;
+    detailsHtml += `<div style="padding:10px 12px;background:var(--bg);border:1px solid var(--border);border-radius:8px;margin-bottom:8px;">
+      <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+        <span style="font-weight:600;font-size:13px;">Cartridge #${i + 1}</span>
+        <span style="font-size:12px;color:var(--text-muted);">${pct.toFixed(0)}% full</span>
+      </div>
+      <div class="progress-bar-container" style="margin-bottom:6px;">
+        <div class="progress-bar-fill" style="width:${pct}%;background:var(--accent);"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px;text-align:center;">
+        <div><div style="font-weight:700;color:var(--accent);">${thisVol.toFixed(1)}</div><div style="font-size:10px;color:var(--text-muted);">ML</div></div>
+        <div><div style="font-weight:700;color:var(--accent);">${thisMg.toFixed(1)}</div><div style="font-size:10px;color:var(--text-muted);">MG</div></div>
+        <div><div style="font-weight:700;color:var(--accent);">${thisDoses}</div><div style="font-size:10px;color:var(--text-muted);">DOSES</div></div>
+      </div>
+    </div>`;
+  }
+  document.getElementById('cart-details').innerHTML = detailsHtml;
+  document.getElementById('cart-total-count').textContent = calcState.cartridgeCount;
+  document.getElementById('cart-ml-used').textContent = (effectiveVol - Math.max(0, remainingVol)).toFixed(1);
+  document.getElementById('cart-ml-left').textContent = Math.max(0, remainingVol).toFixed(1);
+  document.getElementById('cart-total-doses').textContent = totalDoses;
+}
+
 updateCalc();
+updateCartridgePlan();
 
 // Pen/Vial tracker
 function getPenData() {

@@ -1,0 +1,2559 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Peptide Tracker</title>
+  <style>
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+:root {
+  --bg: #0f1117;
+  --bg-card: #1a1d27;
+  --bg-input: #252833;
+  --border: #2e3140;
+  --text: #e4e5ea;
+  --text-muted: #8b8d98;
+  --accent: #6c5ce7;
+  --accent-hover: #7c6ef7;
+  --green: #00b894;
+  --red: #e17055;
+  --orange: #fdcb6e;
+  --radius: 12px;
+  --radius-sm: 8px;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+#app {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 0 16px 80px;
+}
+
+header {
+  padding: 24px 0 16px;
+}
+
+header h1 {
+  font-size: 24px;
+  font-weight: 700;
+  margin-bottom: 16px;
+  letter-spacing: -0.5px;
+}
+
+nav {
+  display: flex;
+  gap: 4px;
+  background: var(--bg-card);
+  border-radius: var(--radius);
+  padding: 4px;
+}
+
+.nav-btn {
+  flex: 1;
+  padding: 10px 6px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.nav-btn.active {
+  background: var(--accent);
+  color: #fff;
+}
+
+.nav-btn:hover:not(.active) {
+  color: var(--text);
+}
+
+.view {
+  display: none;
+}
+
+.view.active {
+  display: block;
+}
+
+.stats-row {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.stats-row-3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.stat-card {
+  background: var(--bg-card);
+  border-radius: var(--radius);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+}
+
+.stat-label {
+  font-size: 12px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+}
+
+.stat-value {
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -1px;
+  line-height: 1.2;
+}
+
+.stat-unit {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.goal-card {
+  background: var(--bg-card);
+  border-radius: var(--radius);
+  padding: 20px;
+  margin-top: 16px;
+}
+
+.goal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.goal-header h2 {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.goal-target {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.progress-bar-container {
+  width: 100%;
+  height: 12px;
+  background: var(--bg-input);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), var(--green));
+  border-radius: 6px;
+  transition: width 0.5s ease;
+  min-width: 0;
+}
+
+.progress-label {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 8px;
+  font-size: 13px;
+}
+
+.progress-label span:first-child {
+  font-weight: 600;
+  color: var(--green);
+}
+
+.progress-label span:last-child {
+  color: var(--text-muted);
+}
+
+.goal-metrics {
+  display: flex;
+  gap: 12px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.goal-metric {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.goal-metric-value {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+}
+
+.goal-metric-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  margin-top: 2px;
+}
+
+.chart-container {
+  background: var(--bg-card);
+  border-radius: var(--radius);
+  padding: 20px;
+  margin-top: 16px;
+}
+
+.chart-container h2 {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.chart-controls {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 16px;
+}
+
+.chart-range, .levels-range {
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.chart-range.active, .levels-range.active {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(108, 92, 231, 0.1);
+}
+
+#weight-chart {
+  width: 100%;
+  height: 220px;
+}
+
+.form-card {
+  background: var(--bg-card);
+  border-radius: var(--radius);
+  padding: 20px;
+  margin-top: 16px;
+}
+
+.form-card h2 {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+
+.form-row {
+  display: flex;
+  gap: 12px;
+}
+
+.form-group-flex {
+  flex: 1;
+}
+
+.form-group {
+  margin-bottom: 14px;
+}
+
+.form-group label {
+  display: block;
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+  font-weight: 500;
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+  width: 100%;
+  padding: 10px 12px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: 15px;
+  font-family: inherit;
+  transition: border-color 0.2s;
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.form-group select {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%238b8d98'%3E%3Cpath d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 32px;
+}
+
+.form-group textarea {
+  resize: vertical;
+  min-height: 60px;
+}
+
+.btn-primary {
+  width: 100%;
+  padding: 12px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+  margin-top: 4px;
+}
+
+.btn-primary:hover {
+  background: var(--accent-hover);
+}
+
+.btn-secondary {
+  padding: 10px 20px;
+  background: var(--bg-input);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-secondary:hover {
+  border-color: var(--text-muted);
+}
+
+.btn-danger {
+  padding: 10px 20px;
+  background: var(--red);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.history-section,
+.recent-section {
+  margin-top: 20px;
+}
+
+.history-section h2,
+.recent-section h2 {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.history-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  background: var(--bg-card);
+  border-radius: var(--radius-sm);
+  margin-bottom: 8px;
+}
+
+.history-item-left {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.history-date {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.history-value {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.history-detail {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.history-change {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.history-change.down {
+  color: var(--green);
+}
+
+.history-change.up {
+  color: var(--red);
+}
+
+.history-change.same {
+  color: var(--text-muted);
+}
+
+.history-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.delete-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px;
+  font-size: 16px;
+  line-height: 1;
+  transition: color 0.2s;
+}
+
+.delete-btn:hover {
+  color: var(--red);
+}
+
+.empty-state {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+.protocol-info {
+  background: var(--bg-card);
+  border-radius: var(--radius);
+  padding: 20px;
+  margin-top: 16px;
+}
+
+.protocol-info h2 {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.protocol-desc {
+  font-size: 14px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.timeline-section {
+  margin-top: 20px;
+}
+
+.timeline-section h2 {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.timeline-tier {
+  position: relative;
+  padding: 16px 16px 16px 28px;
+  background: var(--bg-card);
+  border-radius: var(--radius-sm);
+  margin-bottom: 8px;
+}
+
+.timeline-tier::before {
+  content: '';
+  position: absolute;
+  left: 12px;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--border);
+  border-radius: 2px;
+}
+
+.timeline-tier.active::before {
+  background: var(--accent);
+}
+
+.timeline-tier.completed::before {
+  background: var(--green);
+}
+
+.tier-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.tier-name {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.tier-dose {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.timeline-tier.active .tier-dose {
+  color: var(--accent);
+}
+
+.timeline-tier.completed .tier-dose {
+  color: var(--green);
+}
+
+.tier-dates {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.tier-badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  margin-left: 8px;
+}
+
+.tier-badge.current {
+  background: rgba(108, 92, 231, 0.2);
+  color: var(--accent);
+}
+
+.tier-badge.done {
+  background: rgba(0, 184, 148, 0.2);
+  color: var(--green);
+}
+
+.pk-info {
+  background: var(--bg-card);
+  border-radius: var(--radius);
+  padding: 20px;
+  margin-top: 16px;
+}
+
+.pk-info h2 {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.pk-params {
+  margin-bottom: 16px;
+}
+
+.pk-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.pk-row:last-child {
+  border-bottom: none;
+}
+
+.pk-label {
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.pk-value {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.pk-disclaimer {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.5;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+#levels-chart,
+#dash-levels-chart {
+  width: 100%;
+  height: 260px;
+}
+
+.data-section {
+  margin-top: 20px;
+  background: var(--bg-card);
+  border-radius: var(--radius);
+  padding: 20px;
+}
+
+.data-section h2 {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.data-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.import-label {
+  display: inline-flex;
+  align-items: center;
+}
+
+.toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%) translateY(100px);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 12px 24px;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  font-weight: 500;
+  transition: transform 0.3s ease;
+  z-index: 100;
+  pointer-events: none;
+}
+
+.toast.visible {
+  transform: translateX(-50%) translateY(0);
+}
+
+.toast.success {
+  border-color: var(--green);
+}
+
+.toast.error {
+  border-color: var(--red);
+}
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+  display: none;
+}
+
+.modal-overlay.visible {
+  display: flex;
+}
+
+.modal {
+  background: var(--bg-card);
+  border-radius: var(--radius);
+  padding: 24px;
+  max-width: 360px;
+  width: 90%;
+}
+
+.modal p {
+  font-size: 15px;
+  margin-bottom: 20px;
+  line-height: 1.5;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+
+/* Next Shot Card */
+.next-shot-card {
+  background: var(--bg-card);
+  border-radius: var(--radius);
+  padding: 20px;
+  margin-top: 20px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.next-shot-ring {
+  position: relative;
+  width: 80px;
+  height: 80px;
+  flex-shrink: 0;
+}
+
+.next-shot-ring svg {
+  transform: rotate(-90deg);
+  width: 80px;
+  height: 80px;
+}
+
+.next-shot-ring .ring-bg {
+  fill: none;
+  stroke: var(--bg-input);
+  stroke-width: 6;
+}
+
+.next-shot-ring .ring-fill {
+  fill: none;
+  stroke-width: 6;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.5s ease, stroke 0.3s;
+}
+
+.next-shot-info {
+  flex: 1;
+}
+
+.next-shot-days {
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -1px;
+}
+
+.next-shot-label {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.next-shot-date {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+/* Side Effects */
+.side-effects-group {
+  margin-bottom: 14px;
+}
+
+.side-effects-group label {
+  display: block;
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+
+.side-effects-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.side-effect-chip {
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 16px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.side-effect-chip.selected {
+  border-color: var(--accent);
+  background: rgba(108, 92, 231, 0.15);
+  color: var(--accent);
+}
+
+/* Site suggestion */
+.site-suggestion {
+  font-size: 12px;
+  color: var(--green);
+  margin-top: 4px;
+}
+
+/* Adherence */
+.adherence-row {
+  display: flex;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.adherence-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--border);
+}
+
+.adherence-dot.hit {
+  background: var(--green);
+}
+
+.adherence-dot.missed {
+  background: var(--red);
+}
+
+/* Profile Picker */
+.profile-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--bg);
+  z-index: 300;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.profile-overlay.hidden {
+  display: none;
+}
+
+.profile-picker {
+  width: 90%;
+  max-width: 360px;
+  text-align: center;
+}
+
+.profile-picker h1 {
+  font-size: 24px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.profile-picker p {
+  color: var(--text-muted);
+  font-size: 14px;
+  margin-bottom: 24px;
+}
+
+.profile-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.profile-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: var(--bg-card);
+  border: 2px solid transparent;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+
+.profile-item:hover {
+  border-color: var(--accent);
+}
+
+.profile-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: 700;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.profile-item-name {
+  font-size: 16px;
+  font-weight: 600;
+  text-align: left;
+}
+
+.profile-add-form {
+  display: flex;
+  gap: 8px;
+}
+
+.profile-add-form input {
+  flex: 1;
+  padding: 10px 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: 15px;
+  font-family: inherit;
+}
+
+.profile-add-form input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.profile-add-form button {
+  padding: 10px 16px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* Header profile switcher */
+.header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.profile-switcher {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+
+.profile-switcher:hover {
+  border-color: var(--accent);
+}
+
+.profile-switcher-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.profile-switcher-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.profile-switcher-arrow {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+@media (max-width: 480px) {
+  .stats-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .stat-value {
+    font-size: 24px;
+  }
+
+  .data-actions {
+    flex-direction: column;
+  }
+}
+  </style>
+</head>
+<body>
+  <div id="profile-overlay" class="profile-overlay">
+    <div class="profile-picker">
+      <h1>Peptide Tracker</h1>
+      <p>Who's tracking today?</p>
+      <div class="profile-list" id="profile-list"></div>
+      <div class="profile-add-form">
+        <input type="text" id="new-profile-name" placeholder="Add new profile..." maxlength="20">
+        <button id="add-profile-btn">Add</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="app">
+    <header>
+      <div class="header-row">
+        <h1>Peptide Tracker</h1>
+        <div class="profile-switcher" id="profile-switcher">
+          <div class="profile-switcher-avatar" id="switcher-avatar"></div>
+          <span class="profile-switcher-name" id="switcher-name"></span>
+          <span class="profile-switcher-arrow">&#9662;</span>
+        </div>
+      </div>
+      <nav>
+        <button class="nav-btn active" data-view="dashboard">Dashboard</button>
+        <button class="nav-btn" data-view="weight">Weight</button>
+        <button class="nav-btn" data-view="doses">Doses</button>
+        <button class="nav-btn" data-view="levels">Levels</button>
+        <button class="nav-btn" data-view="protocol">Protocol</button>
+      </nav>
+    </header>
+
+    <main>
+      <!-- Dashboard View -->
+      <section id="view-dashboard" class="view active">
+        <div class="stats-row-3">
+          <div class="stat-card">
+            <span class="stat-label">Total Change</span>
+            <span class="stat-value" id="stat-total-lost">--</span>
+            <span class="stat-unit">lbs</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">BMI</span>
+            <span class="stat-value" id="stat-bmi">--</span>
+            <span class="stat-unit"></span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">Weight</span>
+            <span class="stat-value" id="stat-current-weight">--</span>
+            <span class="stat-unit">lbs</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">Percent</span>
+            <span class="stat-value" id="stat-pct-lost">--</span>
+            <span class="stat-unit"></span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">Weekly Avg</span>
+            <span class="stat-value" id="stat-weekly-avg">--</span>
+            <span class="stat-unit">lb/wk</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">To Goal</span>
+            <span class="stat-value" id="stat-to-goal">--</span>
+            <span class="stat-unit" id="stat-to-goal-pct">lbs</span>
+          </div>
+        </div>
+        <div id="next-shot-section" class="next-shot-card" hidden>
+          <div class="next-shot-ring">
+            <svg viewBox="0 0 80 80">
+              <circle class="ring-bg" cx="40" cy="40" r="34"/>
+              <circle class="ring-fill" id="next-shot-ring-fill" cx="40" cy="40" r="34" stroke-dasharray="213.6" stroke-dashoffset="0"/>
+            </svg>
+          </div>
+          <div class="next-shot-info">
+            <div class="next-shot-days" id="next-shot-days">--</div>
+            <div class="next-shot-label">to next shot</div>
+            <div class="next-shot-date" id="next-shot-date"></div>
+          </div>
+        </div>
+        <div class="stats-row-3">
+          <div class="stat-card">
+            <span class="stat-label">Current Dose</span>
+            <span class="stat-value" id="stat-current-dose">--</span>
+            <span class="stat-unit">mg</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">Protocol Week</span>
+            <span class="stat-value" id="stat-protocol-week">--</span>
+            <span class="stat-unit"></span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">Shots Taken</span>
+            <span class="stat-value" id="stat-shots-taken">--</span>
+            <span class="stat-unit" id="stat-adherence-label"></span>
+          </div>
+        </div>
+        <div id="goal-section" class="goal-card" hidden>
+          <div class="goal-header">
+            <h2>Goal Progress</h2>
+            <span class="goal-target" id="goal-target-label"></span>
+          </div>
+          <div class="progress-bar-container">
+            <div class="progress-bar" id="goal-progress-bar"></div>
+          </div>
+          <div class="progress-label">
+            <span id="goal-pct">0%</span>
+            <span id="goal-remaining"></span>
+          </div>
+        </div>
+        <div class="chart-container">
+          <h2>Weight Trend</h2>
+          <div class="chart-controls">
+            <button class="chart-range active" data-range="30">30d</button>
+            <button class="chart-range" data-range="90">90d</button>
+            <button class="chart-range" data-range="all">All</button>
+          </div>
+          <canvas id="weight-chart"></canvas>
+        </div>
+        <div class="chart-container">
+          <h2>Dose Levels</h2>
+          <canvas id="dash-levels-chart"></canvas>
+        </div>
+        <div class="recent-section">
+          <h2>Recent Doses</h2>
+          <div id="recent-doses"></div>
+        </div>
+      </section>
+
+      <!-- Weight View -->
+      <section id="view-weight" class="view">
+        <div class="form-card">
+          <h2>Log Weight</h2>
+          <form id="weight-form">
+            <div class="form-group">
+              <label for="weight-date">Date</label>
+              <input type="date" id="weight-date" required>
+            </div>
+            <div class="form-group">
+              <label for="weight-value">Weight (lbs)</label>
+              <input type="number" id="weight-value" step="0.1" min="50" max="999" required placeholder="e.g. 215.4">
+            </div>
+            <button type="submit" class="btn-primary">Log Weight</button>
+          </form>
+        </div>
+        <div class="history-section">
+          <h2>Weight History</h2>
+          <div id="weight-history"></div>
+        </div>
+      </section>
+
+      <!-- Doses View -->
+      <section id="view-doses" class="view">
+        <div class="form-card">
+          <h2>Log Dose</h2>
+          <form id="dose-form">
+            <div class="form-row">
+              <div class="form-group form-group-flex">
+                <label for="dose-date">Date</label>
+                <input type="date" id="dose-date" required>
+              </div>
+              <div class="form-group form-group-flex">
+                <label for="dose-time">Time</label>
+                <input type="time" id="dose-time" required>
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="dose-amount">Dose (mg)</label>
+              <select id="dose-amount" required>
+                <option value="">Select dose</option>
+                <optgroup label="Escalation (Weeks 1-4)">
+                  <option value="2">2 mg</option>
+                </optgroup>
+                <optgroup label="Escalation (Weeks 5-8)">
+                  <option value="4">4 mg</option>
+                </optgroup>
+                <optgroup label="Escalation (Weeks 9-12)">
+                  <option value="8">8 mg</option>
+                </optgroup>
+                <optgroup label="Maintenance (Weeks 13-48)">
+                  <option value="12">12 mg</option>
+                </optgroup>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="dose-site">Injection Site</label>
+              <select id="dose-site">
+                <option value="">Select site</option>
+                <option value="abdomen-left">Abdomen (Left)</option>
+                <option value="abdomen-right">Abdomen (Right)</option>
+                <option value="thigh-left">Thigh (Left)</option>
+                <option value="thigh-right">Thigh (Right)</option>
+                <option value="arm-left">Upper Arm (Left)</option>
+                <option value="arm-right">Upper Arm (Right)</option>
+              </select>
+              <div class="site-suggestion" id="site-suggestion"></div>
+            </div>
+            <div class="side-effects-group">
+              <label>Side Effects</label>
+              <div class="side-effects-chips" id="side-effects-chips">
+                <button type="button" class="side-effect-chip" data-effect="nausea">Nausea</button>
+                <button type="button" class="side-effect-chip" data-effect="fatigue">Fatigue</button>
+                <button type="button" class="side-effect-chip" data-effect="headache">Headache</button>
+                <button type="button" class="side-effect-chip" data-effect="diarrhea">Diarrhea</button>
+                <button type="button" class="side-effect-chip" data-effect="constipation">Constipation</button>
+                <button type="button" class="side-effect-chip" data-effect="appetite-loss">Low Appetite</button>
+                <button type="button" class="side-effect-chip" data-effect="injection-site">Injection Site</button>
+                <button type="button" class="side-effect-chip" data-effect="dizziness">Dizziness</button>
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="dose-notes">Notes</label>
+              <textarea id="dose-notes" rows="2" placeholder="Additional notes..."></textarea>
+            </div>
+            <button type="submit" class="btn-primary">Log Dose</button>
+          </form>
+        </div>
+        <div class="history-section">
+          <h2>Dose History</h2>
+          <div id="dose-history"></div>
+        </div>
+      </section>
+
+      <!-- Levels View -->
+      <section id="view-levels" class="view">
+        <div class="stats-row">
+          <div class="stat-card">
+            <span class="stat-label">In System</span>
+            <span class="stat-value" id="stat-current-level">--</span>
+            <span class="stat-unit">mg</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">Steady State</span>
+            <span class="stat-value" id="stat-steady-state">--</span>
+            <span class="stat-unit"></span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">Time to Peak</span>
+            <span class="stat-value" id="stat-time-to-peak">--</span>
+            <span class="stat-unit"></span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">Next Dose In</span>
+            <span class="stat-value" id="stat-next-dose">--</span>
+            <span class="stat-unit"></span>
+          </div>
+        </div>
+        <div class="chart-container">
+          <h2>Estimated Plasma Concentration</h2>
+          <div class="chart-controls">
+            <button class="levels-range active" data-range="30">30d</button>
+            <button class="levels-range" data-range="60">60d</button>
+            <button class="levels-range" data-range="all">All</button>
+          </div>
+          <canvas id="levels-chart"></canvas>
+        </div>
+        <div class="pk-info">
+          <h2>Pharmacokinetics</h2>
+          <div class="pk-params">
+            <div class="pk-row">
+              <span class="pk-label">Elimination Half-Life</span>
+              <span class="pk-value">~6 days (144 hrs)</span>
+            </div>
+            <div class="pk-row">
+              <span class="pk-label">Time to Peak (Tmax)</span>
+              <span class="pk-value">24-48 hours</span>
+            </div>
+            <div class="pk-row">
+              <span class="pk-label">PK Profile</span>
+              <span class="pk-value">Dose-proportional</span>
+            </div>
+            <div class="pk-row">
+              <span class="pk-label">Steady State Reached</span>
+              <span class="pk-value">~4-5 weeks</span>
+            </div>
+            <div class="pk-row">
+              <span class="pk-label">Full Clearance (97%)</span>
+              <span class="pk-value">~30 days (5 half-lives)</span>
+            </div>
+            <div class="pk-row">
+              <span class="pk-label">Mechanism</span>
+              <span class="pk-value">Fatty diacid–albumin binding</span>
+            </div>
+          </div>
+          <p class="pk-disclaimer">PK model based on Jastreboff et al., N Engl J Med 2023;389:514-26 (Phase 2 TRIUMPH trial) and Urva et al., Lancet 2022;400:1869-81 (Phase 1b). Individual levels vary with metabolism, injection site, and body composition. Not a substitute for lab monitoring.</p>
+        </div>
+      </section>
+
+      <!-- Protocol View -->
+      <section id="view-protocol" class="view">
+        <div class="protocol-info">
+          <h2>Retatrutide Protocol</h2>
+          <p class="protocol-desc">GLP-1/GIP/Glucagon triple receptor agonist. Weekly subcutaneous injection with dose escalation.</p>
+        </div>
+        <div class="form-card">
+          <h2>Protocol Settings</h2>
+          <form id="protocol-form">
+            <div class="form-group">
+              <label for="protocol-start">Start Date</label>
+              <input type="date" id="protocol-start" required>
+            </div>
+            <div class="form-group">
+              <label for="protocol-height">Height (inches)</label>
+              <input type="number" id="protocol-height" step="0.1" min="36" max="96" placeholder="e.g. 70">
+            </div>
+            <div class="form-group">
+              <label for="start-weight">Starting Weight (lbs)</label>
+              <input type="number" id="start-weight" step="0.1" min="50" max="999" required placeholder="e.g. 230.0">
+            </div>
+            <div class="form-group">
+              <label for="goal-weight">Goal Weight (lbs)</label>
+              <input type="number" id="goal-weight" step="0.1" min="50" max="999" placeholder="e.g. 180.0">
+            </div>
+            <button type="submit" class="btn-primary">Save Protocol</button>
+          </form>
+        </div>
+        <div class="timeline-section">
+          <h2>Escalation Schedule</h2>
+          <div id="protocol-timeline"></div>
+        </div>
+        <div class="data-section">
+          <h2>Data Management</h2>
+          <div class="data-actions">
+            <button class="btn-secondary" id="export-btn">Export Data (JSON)</button>
+            <label class="btn-secondary import-label">
+              Import Data
+              <input type="file" id="import-input" accept=".json" hidden>
+            </label>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div id="toast" class="toast"></div>
+  <div id="confirm-modal" class="modal-overlay">
+    <div class="modal">
+      <p id="confirm-message"></p>
+      <div class="modal-actions">
+        <button class="btn-secondary" id="confirm-cancel">Cancel</button>
+        <button class="btn-danger" id="confirm-ok">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+// Profile system
+function getProfiles() {
+  try { return JSON.parse(localStorage.getItem('pt_profiles')) || []; } catch { return []; }
+}
+
+function saveProfiles(profiles) {
+  localStorage.setItem('pt_profiles', JSON.stringify(profiles));
+}
+
+function getActiveProfileId() {
+  return localStorage.getItem('pt_active_profile') || null;
+}
+
+function setActiveProfileId(id) {
+  localStorage.setItem('pt_active_profile', id);
+}
+
+function migrateExistingData() {
+  const oldWeights = localStorage.getItem('pt_weights');
+  const oldDoses = localStorage.getItem('pt_doses');
+  const oldProtocol = localStorage.getItem('pt_protocol');
+  if (!oldWeights && !oldDoses && !oldProtocol) return null;
+
+  const profiles = getProfiles();
+  if (profiles.length > 0) return null;
+
+  const id = Date.now().toString();
+  const profile = { id, name: 'Jake', color: '#6c5ce7' };
+  profiles.push(profile);
+  saveProfiles(profiles);
+
+  if (oldWeights) { localStorage.setItem('pt_weights_' + id, oldWeights); localStorage.removeItem('pt_weights'); }
+  if (oldDoses) { localStorage.setItem('pt_doses_' + id, oldDoses); localStorage.removeItem('pt_doses'); }
+  if (oldProtocol) { localStorage.setItem('pt_protocol_' + id, oldProtocol); localStorage.removeItem('pt_protocol'); }
+
+  return id;
+}
+
+const PROFILE_COLORS = ['#6c5ce7','#00b894','#e17055','#fdcb6e','#0984e3','#e84393','#00cec9','#d63031'];
+
+function createProfile(name) {
+  const profiles = getProfiles();
+  const color = PROFILE_COLORS[profiles.length % PROFILE_COLORS.length];
+  const profile = { id: Date.now().toString(), name, color };
+  profiles.push(profile);
+  saveProfiles(profiles);
+  return profile;
+}
+
+function getActiveProfile() {
+  const id = getActiveProfileId();
+  if (!id) return null;
+  return getProfiles().find(p => p.id === id) || null;
+}
+
+const STORAGE_KEYS = {
+  get weights() { return 'pt_weights_' + getActiveProfileId(); },
+  get doses() { return 'pt_doses_' + getActiveProfileId(); },
+  get protocol() { return 'pt_protocol_' + getActiveProfileId(); },
+};
+
+function renderProfilePicker() {
+  const profiles = getProfiles();
+  const list = document.getElementById('profile-list');
+  list.innerHTML = profiles.map(p => `
+    <div class="profile-item" data-profile-id="${p.id}">
+      <div class="profile-avatar" style="background:${p.color}">${p.name.charAt(0).toUpperCase()}</div>
+      <span class="profile-item-name">${p.name}</span>
+    </div>
+  `).join('');
+
+  list.querySelectorAll('.profile-item').forEach(item => {
+    item.addEventListener('click', () => {
+      selectProfile(item.dataset.profileId);
+    });
+  });
+}
+
+function selectProfile(id) {
+  setActiveProfileId(id);
+  document.getElementById('profile-overlay').classList.add('hidden');
+  updateSwitcher();
+  initApp();
+}
+
+function updateSwitcher() {
+  const profile = getActiveProfile();
+  if (!profile) return;
+  document.getElementById('switcher-avatar').textContent = profile.name.charAt(0).toUpperCase();
+  document.getElementById('switcher-avatar').style.background = profile.color;
+  document.getElementById('switcher-name').textContent = profile.name;
+}
+
+document.getElementById('add-profile-btn').addEventListener('click', () => {
+  const input = document.getElementById('new-profile-name');
+  const name = input.value.trim();
+  if (!name) return;
+  const profile = createProfile(name);
+  input.value = '';
+  renderProfilePicker();
+  selectProfile(profile.id);
+});
+
+document.getElementById('new-profile-name').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('add-profile-btn').click();
+});
+
+document.getElementById('profile-switcher').addEventListener('click', () => {
+  document.getElementById('profile-overlay').classList.remove('hidden');
+  renderProfilePicker();
+});
+
+// Boot: migrate, then show picker or go straight to app
+const migratedId = migrateExistingData();
+if (migratedId) {
+  setActiveProfileId(migratedId);
+  document.getElementById('profile-overlay').classList.add('hidden');
+  updateSwitcher();
+} else if (getActiveProfileId() && getActiveProfile()) {
+  document.getElementById('profile-overlay').classList.add('hidden');
+  updateSwitcher();
+} else {
+  renderProfilePicker();
+}
+
+const PROTOCOL_TIERS = [
+  { name: 'Escalation 1', dose: 2, weeks: [1, 4], duration: 4 },
+  { name: 'Escalation 2', dose: 4, weeks: [5, 8], duration: 4 },
+  { name: 'Escalation 3', dose: 8, weeks: [9, 12], duration: 4 },
+  { name: 'Maintenance', dose: 12, weeks: [13, 48], duration: 36 },
+];
+
+function load(key) {
+  try {
+    return JSON.parse(localStorage.getItem(key)) || null;
+  } catch {
+    return null;
+  }
+}
+
+function save(key, data) {
+  localStorage.setItem(key, JSON.stringify(data));
+}
+
+function getWeights() {
+  return load(STORAGE_KEYS.weights) || [];
+}
+
+function getDoses() {
+  return load(STORAGE_KEYS.doses) || [];
+}
+
+function getProtocol() {
+  return load(STORAGE_KEYS.protocol) || null;
+}
+
+function formatDate(dateStr) {
+  const d = new Date(dateStr + 'T12:00:00');
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function formatDateShort(dateStr) {
+  const d = new Date(dateStr + 'T12:00:00');
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+function formatTime(timeStr) {
+  const [h, m] = timeStr.split(':').map(Number);
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  const h12 = h % 12 || 12;
+  return `${h12}:${String(m).padStart(2, '0')} ${ampm}`;
+}
+
+function doseTimestamp(dose) {
+  return new Date(`${dose.date}T${dose.time || '09:00'}:00`).getTime();
+}
+
+function todayStr() {
+  return new Date().toISOString().split('T')[0];
+}
+
+function showToast(message, type = 'success') {
+  const toast = document.getElementById('toast');
+  toast.textContent = message;
+  toast.className = `toast ${type} visible`;
+  setTimeout(() => { toast.className = 'toast'; }, 2500);
+}
+
+let confirmResolve = null;
+
+function showConfirm(message) {
+  return new Promise(resolve => {
+    confirmResolve = resolve;
+    document.getElementById('confirm-message').textContent = message;
+    document.getElementById('confirm-modal').classList.add('visible');
+  });
+}
+
+document.getElementById('confirm-ok').addEventListener('click', () => {
+  document.getElementById('confirm-modal').classList.remove('visible');
+  if (confirmResolve) confirmResolve(true);
+});
+
+document.getElementById('confirm-cancel').addEventListener('click', () => {
+  document.getElementById('confirm-modal').classList.remove('visible');
+  if (confirmResolve) confirmResolve(false);
+});
+
+// Navigation
+document.querySelectorAll('.nav-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById(`view-${btn.dataset.view}`).classList.add('active');
+    if (btn.dataset.view === 'dashboard') renderDashboard();
+    if (btn.dataset.view === 'weight') renderWeightHistory();
+    if (btn.dataset.view === 'doses') renderDoseHistory();
+    if (btn.dataset.view === 'levels') renderLevels();
+    if (btn.dataset.view === 'protocol') renderProtocol();
+  });
+});
+
+// Weight form
+document.getElementById('weight-date').value = todayStr();
+document.getElementById('weight-form').addEventListener('submit', e => {
+  e.preventDefault();
+  const date = document.getElementById('weight-date').value;
+  const value = parseFloat(document.getElementById('weight-value').value);
+  if (!date || isNaN(value)) return;
+
+  const weights = getWeights();
+  const existing = weights.findIndex(w => w.date === date);
+  if (existing >= 0) {
+    weights[existing].value = value;
+  } else {
+    weights.push({ date, value, id: Date.now().toString() });
+  }
+  weights.sort((a, b) => a.date.localeCompare(b.date));
+  save(STORAGE_KEYS.weights, weights);
+
+  document.getElementById('weight-value').value = '';
+  showToast(`Weight logged: ${value} lbs`);
+  renderWeightHistory();
+});
+
+// Side effect chip toggles
+document.querySelectorAll('.side-effect-chip').forEach(chip => {
+  chip.addEventListener('click', () => chip.classList.toggle('selected'));
+});
+
+// Site rotation suggestion
+const SITE_ORDER = ['abdomen-left','abdomen-right','thigh-left','thigh-right','arm-left','arm-right'];
+const SITE_LABELS = {
+  'abdomen-left': 'Abdomen (Left)', 'abdomen-right': 'Abdomen (Right)',
+  'thigh-left': 'Thigh (Left)', 'thigh-right': 'Thigh (Right)',
+  'arm-left': 'Upper Arm (Left)', 'arm-right': 'Upper Arm (Right)',
+};
+
+function updateSiteSuggestion() {
+  const doses = getDoses();
+  const el = document.getElementById('site-suggestion');
+  if (!doses.length) { el.textContent = ''; return; }
+  const lastSite = [...doses].reverse().find(d => d.site)?.site;
+  if (!lastSite) { el.textContent = ''; return; }
+  const idx = SITE_ORDER.indexOf(lastSite);
+  const next = SITE_ORDER[(idx + 1) % SITE_ORDER.length];
+  el.textContent = `Suggested: ${SITE_LABELS[next]} (rotate from ${SITE_LABELS[lastSite]})`;
+}
+
+// Dose form
+document.getElementById('dose-date').value = todayStr();
+document.getElementById('dose-time').value = new Date().toTimeString().slice(0, 5);
+updateSiteSuggestion();
+
+document.getElementById('dose-form').addEventListener('submit', e => {
+  e.preventDefault();
+  const date = document.getElementById('dose-date').value;
+  const time = document.getElementById('dose-time').value || '09:00';
+  const amount = parseFloat(document.getElementById('dose-amount').value);
+  const site = document.getElementById('dose-site').value;
+  const notes = document.getElementById('dose-notes').value.trim();
+  if (!date || isNaN(amount)) return;
+
+  const sideEffects = [...document.querySelectorAll('.side-effect-chip.selected')].map(c => c.dataset.effect);
+
+  const doses = getDoses();
+  doses.push({ date, time, amount, site, notes, sideEffects, id: Date.now().toString() });
+  doses.sort((a, b) => `${a.date}T${a.time || '09:00'}`.localeCompare(`${b.date}T${b.time || '09:00'}`));
+  save(STORAGE_KEYS.doses, doses);
+
+  document.getElementById('dose-amount').value = '';
+  document.getElementById('dose-site').value = '';
+  document.getElementById('dose-notes').value = '';
+  document.querySelectorAll('.side-effect-chip.selected').forEach(c => c.classList.remove('selected'));
+  showToast(`Dose logged: ${amount} mg`);
+  renderDoseHistory();
+  updateSiteSuggestion();
+});
+
+// Protocol form
+function loadProtocolForm() {
+  const protocol = getProtocol();
+  if (protocol) {
+    document.getElementById('protocol-start').value = protocol.startDate || '';
+    document.getElementById('protocol-height').value = protocol.height || '';
+    document.getElementById('start-weight').value = protocol.startWeight || '';
+    document.getElementById('goal-weight').value = protocol.goalWeight || '';
+  } else {
+    document.getElementById('protocol-start').value = '';
+    document.getElementById('protocol-height').value = '';
+    document.getElementById('start-weight').value = '';
+    document.getElementById('goal-weight').value = '';
+  }
+}
+loadProtocolForm();
+
+document.getElementById('protocol-form').addEventListener('submit', e => {
+  e.preventDefault();
+  const startDate = document.getElementById('protocol-start').value;
+  const height = parseFloat(document.getElementById('protocol-height').value) || null;
+  const startWeight = parseFloat(document.getElementById('start-weight').value);
+  const goalWeight = parseFloat(document.getElementById('goal-weight').value) || null;
+  if (!startDate || isNaN(startWeight)) return;
+
+  save(STORAGE_KEYS.protocol, { startDate, height, startWeight, goalWeight });
+  showToast('Protocol saved');
+  renderProtocol();
+  renderDashboard();
+});
+
+// Render weight history
+function renderWeightHistory() {
+  const weights = getWeights();
+  const container = document.getElementById('weight-history');
+  if (!weights.length) {
+    container.innerHTML = '<div class="empty-state">No weight entries yet. Log your first weight above.</div>';
+    return;
+  }
+
+  const sorted = [...weights].reverse();
+  container.innerHTML = sorted.map((w, i) => {
+    const prevIdx = i + 1;
+    let changeHtml = '';
+    if (prevIdx < sorted.length) {
+      const diff = w.value - sorted[prevIdx].value;
+      const cls = diff < 0 ? 'down' : diff > 0 ? 'up' : 'same';
+      const sign = diff > 0 ? '+' : '';
+      changeHtml = `<span class="history-change ${cls}">${sign}${diff.toFixed(1)}</span>`;
+    }
+    return `
+      <div class="history-item">
+        <div class="history-item-left">
+          <span class="history-date">${formatDate(w.date)}</span>
+          <span class="history-value">${w.value} lbs</span>
+        </div>
+        <div class="history-actions">
+          ${changeHtml}
+          <button class="delete-btn" data-type="weight" data-id="${w.id}" title="Delete">&times;</button>
+        </div>
+      </div>`;
+  }).join('');
+
+  container.querySelectorAll('.delete-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const ok = await showConfirm('Delete this weight entry?');
+      if (!ok) return;
+      const weights = getWeights().filter(w => w.id !== btn.dataset.id);
+      save(STORAGE_KEYS.weights, weights);
+      renderWeightHistory();
+      showToast('Entry deleted');
+    });
+  });
+}
+
+// Render dose history
+function renderDoseHistory() {
+  const doses = getDoses();
+  const container = document.getElementById('dose-history');
+  if (!doses.length) {
+    container.innerHTML = '<div class="empty-state">No doses logged yet. Log your first dose above.</div>';
+    return;
+  }
+
+  const siteLabels = {
+    'abdomen-left': 'Abdomen (L)',
+    'abdomen-right': 'Abdomen (R)',
+    'thigh-left': 'Thigh (L)',
+    'thigh-right': 'Thigh (R)',
+    'arm-left': 'Arm (L)',
+    'arm-right': 'Arm (R)',
+  };
+
+  const sorted = [...doses].reverse();
+  container.innerHTML = sorted.map(d => {
+    const details = [];
+    if (d.time) details.push(formatTime(d.time));
+    if (d.site) details.push(siteLabels[d.site] || d.site);
+    if (d.notes) details.push(d.notes);
+    const effectsHtml = d.sideEffects && d.sideEffects.length
+      ? `<span class="history-detail">${d.sideEffects.map(e => e.replace('-', ' ')).join(', ')}</span>` : '';
+    return `
+      <div class="history-item">
+        <div class="history-item-left">
+          <span class="history-date">${formatDate(d.date)}</span>
+          <span class="history-value">${d.amount} mg</span>
+          ${details.length ? `<span class="history-detail">${details.join(' · ')}</span>` : ''}
+          ${effectsHtml}
+        </div>
+        <div class="history-actions">
+          <button class="delete-btn" data-type="dose" data-id="${d.id}" title="Delete">&times;</button>
+        </div>
+      </div>`;
+  }).join('');
+
+  container.querySelectorAll('.delete-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const ok = await showConfirm('Delete this dose entry?');
+      if (!ok) return;
+      const doses = getDoses().filter(d => d.id !== btn.dataset.id);
+      save(STORAGE_KEYS.doses, doses);
+      renderDoseHistory();
+      showToast('Entry deleted');
+    });
+  });
+}
+
+// Render protocol timeline
+function renderProtocol() {
+  const protocol = getProtocol();
+  const container = document.getElementById('protocol-timeline');
+
+  if (!protocol) {
+    container.innerHTML = '<div class="empty-state">Set your protocol start date above to see the escalation timeline.</div>';
+    return;
+  }
+
+  const startDate = new Date(protocol.startDate + 'T12:00:00');
+  const today = new Date();
+  const daysSinceStart = Math.floor((today - startDate) / (1000 * 60 * 60 * 24));
+  const currentWeek = Math.max(1, Math.floor(daysSinceStart / 7) + 1);
+
+  container.innerHTML = PROTOCOL_TIERS.map(tier => {
+    const tierStartDate = new Date(startDate);
+    tierStartDate.setDate(tierStartDate.getDate() + (tier.weeks[0] - 1) * 7);
+    const tierEndDate = new Date(startDate);
+    tierEndDate.setDate(tierEndDate.getDate() + tier.weeks[1] * 7 - 1);
+
+    let status = '';
+    let badge = '';
+    if (currentWeek > tier.weeks[1]) {
+      status = 'completed';
+      badge = '<span class="tier-badge done">Done</span>';
+    } else if (currentWeek >= tier.weeks[0] && currentWeek <= tier.weeks[1]) {
+      status = 'active';
+      badge = '<span class="tier-badge current">Current</span>';
+    }
+
+    const startStr = formatDateShort(tierStartDate.toISOString().split('T')[0]);
+    const endStr = formatDateShort(tierEndDate.toISOString().split('T')[0]);
+
+    return `
+      <div class="timeline-tier ${status}">
+        <div class="tier-header">
+          <span class="tier-name">${tier.name} (Weeks ${tier.weeks[0]}-${tier.weeks[1]})${badge}</span>
+          <span class="tier-dose">${tier.dose} mg</span>
+        </div>
+        <div class="tier-dates">${startStr} - ${endStr}</div>
+      </div>`;
+  }).join('');
+}
+
+// Chart drawing
+let currentRange = 30;
+
+function drawChart() {
+  const canvas = document.getElementById('weight-chart');
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  ctx.scale(dpr, dpr);
+
+  const width = rect.width;
+  const height = rect.height;
+  const pad = { top: 20, right: 16, bottom: 32, left: 48 };
+
+  ctx.clearRect(0, 0, width, height);
+
+  let weights = getWeights();
+  if (!weights.length) {
+    ctx.fillStyle = '#8b8d98';
+    ctx.font = '14px -apple-system, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Log weight entries to see your trend', width / 2, height / 2);
+    return;
+  }
+
+  if (currentRange !== 'all') {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - currentRange);
+    const cutoffStr = cutoff.toISOString().split('T')[0];
+    weights = weights.filter(w => w.date >= cutoffStr);
+  }
+
+  if (weights.length < 2) {
+    ctx.fillStyle = '#8b8d98';
+    ctx.font = '14px -apple-system, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Need at least 2 entries for a chart', width / 2, height / 2);
+    return;
+  }
+
+  const values = weights.map(w => w.value);
+  const minVal = Math.min(...values);
+  const maxVal = Math.max(...values);
+  const range = maxVal - minVal || 10;
+  const yMin = minVal - range * 0.1;
+  const yMax = maxVal + range * 0.1;
+
+  const chartW = width - pad.left - pad.right;
+  const chartH = height - pad.top - pad.bottom;
+
+  const xScale = i => pad.left + (i / (weights.length - 1)) * chartW;
+  const yScale = v => pad.top + chartH - ((v - yMin) / (yMax - yMin)) * chartH;
+
+  // Grid lines
+  ctx.strokeStyle = '#2e3140';
+  ctx.lineWidth = 1;
+  const gridLines = 5;
+  for (let i = 0; i <= gridLines; i++) {
+    const y = pad.top + (i / gridLines) * chartH;
+    ctx.beginPath();
+    ctx.moveTo(pad.left, y);
+    ctx.lineTo(width - pad.right, y);
+    ctx.stroke();
+
+    const val = yMax - (i / gridLines) * (yMax - yMin);
+    ctx.fillStyle = '#8b8d98';
+    ctx.font = '11px -apple-system, sans-serif';
+    ctx.textAlign = 'right';
+    ctx.fillText(val.toFixed(0), pad.left - 8, y + 4);
+  }
+
+  // X labels
+  ctx.fillStyle = '#8b8d98';
+  ctx.font = '11px -apple-system, sans-serif';
+  ctx.textAlign = 'center';
+  const labelCount = Math.min(weights.length, 6);
+  for (let i = 0; i < labelCount; i++) {
+    const idx = Math.round(i * (weights.length - 1) / (labelCount - 1));
+    const x = xScale(idx);
+    ctx.fillText(formatDateShort(weights[idx].date), x, height - 8);
+  }
+
+  // Area fill
+  const gradient = ctx.createLinearGradient(0, pad.top, 0, pad.top + chartH);
+  gradient.addColorStop(0, 'rgba(108, 92, 231, 0.3)');
+  gradient.addColorStop(1, 'rgba(108, 92, 231, 0.0)');
+  ctx.beginPath();
+  ctx.moveTo(xScale(0), yScale(values[0]));
+  for (let i = 1; i < values.length; i++) {
+    ctx.lineTo(xScale(i), yScale(values[i]));
+  }
+  ctx.lineTo(xScale(values.length - 1), pad.top + chartH);
+  ctx.lineTo(xScale(0), pad.top + chartH);
+  ctx.closePath();
+  ctx.fillStyle = gradient;
+  ctx.fill();
+
+  // Line
+  ctx.beginPath();
+  ctx.moveTo(xScale(0), yScale(values[0]));
+  for (let i = 1; i < values.length; i++) {
+    ctx.lineTo(xScale(i), yScale(values[i]));
+  }
+  ctx.strokeStyle = '#6c5ce7';
+  ctx.lineWidth = 2.5;
+  ctx.lineJoin = 'round';
+  ctx.stroke();
+
+  // Dots
+  for (let i = 0; i < values.length; i++) {
+    ctx.beginPath();
+    ctx.arc(xScale(i), yScale(values[i]), 3.5, 0, Math.PI * 2);
+    ctx.fillStyle = '#6c5ce7';
+    ctx.fill();
+    ctx.strokeStyle = '#0f1117';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
+
+  // Goal line
+  const proto = getProtocol();
+  if (proto && proto.goalWeight && proto.goalWeight >= yMin && proto.goalWeight <= yMax) {
+    const goalY = yScale(proto.goalWeight);
+    ctx.setLineDash([6, 4]);
+    ctx.beginPath();
+    ctx.moveTo(pad.left, goalY);
+    ctx.lineTo(width - pad.right, goalY);
+    ctx.strokeStyle = '#00b894';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    ctx.fillStyle = '#00b894';
+    ctx.font = '11px -apple-system, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText(`Goal: ${proto.goalWeight}`, pad.left + 4, goalY - 6);
+  }
+}
+
+document.querySelectorAll('.chart-range').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.chart-range').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentRange = btn.dataset.range === 'all' ? 'all' : parseInt(btn.dataset.range);
+    drawChart();
+  });
+});
+
+// Dashboard
+function renderDashboard() {
+  // Reset all stats
+  ['stat-total-lost','stat-bmi','stat-current-weight','stat-pct-lost','stat-weekly-avg','stat-to-goal'].forEach(id => {
+    document.getElementById(id).textContent = '--';
+  });
+  document.getElementById('stat-to-goal-pct').textContent = 'lbs';
+  document.getElementById('stat-current-dose').textContent = '--';
+  document.getElementById('stat-protocol-week').textContent = '--';
+  document.getElementById('stat-shots-taken').textContent = '--';
+
+  const weights = getWeights();
+  const doses = getDoses();
+  const protocol = getProtocol();
+  const start = protocol ? protocol.startWeight : (weights.length ? weights[0].value : null);
+
+  if (weights.length) {
+    const latest = weights[weights.length - 1].value;
+    document.getElementById('stat-current-weight').textContent = latest.toFixed(1);
+
+    const lost = start - latest;
+    document.getElementById('stat-total-lost').textContent = (lost > 0 ? '-' : '') + Math.abs(lost).toFixed(1);
+
+    // Percent body weight change
+    if (start > 0) {
+      const pctLost = ((lost / start) * 100);
+      document.getElementById('stat-pct-lost').textContent = (pctLost > 0 ? '-' : '') + Math.abs(pctLost).toFixed(1) + '%';
+    }
+
+    // BMI: 703 * weight(lbs) / height(in)^2
+    if (protocol && protocol.height) {
+      const bmi = 703 * latest / (protocol.height * protocol.height);
+      document.getElementById('stat-bmi').textContent = bmi.toFixed(1);
+    }
+
+    // Weekly avg loss
+    if (weights.length >= 2) {
+      const firstDate = new Date(weights[0].date + 'T12:00:00');
+      const lastDate = new Date(weights[weights.length - 1].date + 'T12:00:00');
+      const weeksElapsed = (lastDate - firstDate) / (1000 * 60 * 60 * 24 * 7);
+      if (weeksElapsed > 0) {
+        const weeklyAvg = (weights[0].value - latest) / weeksElapsed;
+        document.getElementById('stat-weekly-avg').textContent = (weeklyAvg > 0 ? '-' : '') + Math.abs(weeklyAvg).toFixed(1);
+      }
+    }
+
+    // To goal
+    if (protocol && protocol.goalWeight) {
+      const remaining = latest - protocol.goalWeight;
+      const totalToLose = start - protocol.goalWeight;
+      const pctRemaining = totalToLose > 0 ? Math.round((remaining / totalToLose) * 100) : 0;
+      document.getElementById('stat-to-goal').textContent = remaining > 0 ? remaining.toFixed(1) : '0';
+      document.getElementById('stat-to-goal-pct').textContent = remaining > 0 ? `lbs (${pctRemaining}%)` : 'Done!';
+    }
+  }
+
+  if (doses.length) {
+    const lastDose = doses[doses.length - 1].amount;
+    document.getElementById('stat-current-dose').textContent = lastDose;
+    document.getElementById('stat-shots-taken').textContent = doses.length;
+  }
+
+  if (protocol) {
+    const startDate = new Date(protocol.startDate + 'T12:00:00');
+    const daysSince = Math.floor((new Date() - startDate) / (1000 * 60 * 60 * 24));
+    const week = Math.max(1, Math.floor(daysSince / 7) + 1);
+    document.getElementById('stat-protocol-week').textContent = week;
+  }
+
+  // Next shot countdown
+  const nextShotSection = document.getElementById('next-shot-section');
+  if (doses.length) {
+    nextShotSection.hidden = false;
+    const lastDoseEntry = doses[doses.length - 1];
+    const lastDoseTime = doseTimestamp(lastDoseEntry);
+    const nextDoseTime = lastDoseTime + 7 * 24 * 3600000;
+    const now = Date.now();
+    const msLeft = nextDoseTime - now;
+    const daysLeft = msLeft / (1000 * 60 * 60 * 24);
+    const hoursLeft = msLeft / (1000 * 60 * 60);
+
+    if (msLeft <= 0) {
+      document.getElementById('next-shot-days').textContent = 'Due now';
+    } else if (daysLeft >= 1) {
+      const d = Math.floor(daysLeft);
+      const h = Math.round((daysLeft - d) * 24);
+      document.getElementById('next-shot-days').textContent = `${d} day${d !== 1 ? 's' : ''}${h > 0 ? ` ${h}h` : ''}`;
+    } else {
+      document.getElementById('next-shot-days').textContent = `${Math.round(hoursLeft)} hours`;
+    }
+
+    const nextDate = new Date(nextDoseTime);
+    document.getElementById('next-shot-date').textContent = nextDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) + ' at ' + nextDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+
+    // Ring progress (0 = just injected, 1 = due)
+    const elapsed = 7 * 24 * 3600000 - msLeft;
+    const progress = Math.min(1, Math.max(0, elapsed / (7 * 24 * 3600000)));
+    const circumference = 2 * Math.PI * 34;
+    const offset = circumference * (1 - progress);
+    const ring = document.getElementById('next-shot-ring-fill');
+    ring.style.strokeDasharray = circumference;
+    ring.style.strokeDashoffset = offset;
+    ring.style.stroke = msLeft <= 0 ? 'var(--red)' : progress > 0.85 ? 'var(--orange)' : 'var(--green)';
+  } else {
+    nextShotSection.hidden = true;
+  }
+
+  // Goal progress bar
+  const goalSection = document.getElementById('goal-section');
+  if (protocol && protocol.goalWeight && weights.length) {
+    goalSection.hidden = false;
+    const current = weights[weights.length - 1].value;
+    const goal = protocol.goalWeight;
+    const totalToLose = start - goal;
+    const lost = start - current;
+    const remaining = current - goal;
+    const pct = totalToLose > 0 ? Math.min(100, Math.max(0, (lost / totalToLose) * 100)) : 0;
+
+    document.getElementById('goal-target-label').textContent = `Goal: ${goal} lbs`;
+    document.getElementById('goal-progress-bar').style.width = `${pct}%`;
+    document.getElementById('goal-pct').textContent = `${Math.round(pct)}% complete`;
+    document.getElementById('goal-remaining').textContent = remaining > 0 ? `${remaining.toFixed(1)} lbs to go` : 'Goal reached!';
+  } else {
+    goalSection.hidden = true;
+  }
+
+  // Recent doses
+  const recentContainer = document.getElementById('recent-doses');
+  const recentDoses = [...doses].reverse().slice(0, 3);
+  if (!recentDoses.length) {
+    recentContainer.innerHTML = '<div class="empty-state">No doses logged yet.</div>';
+  } else {
+    recentContainer.innerHTML = recentDoses.map(d => `
+      <div class="history-item">
+        <div class="history-item-left">
+          <span class="history-date">${formatDate(d.date)}</span>
+          <span class="history-value">${d.amount} mg</span>
+        </div>
+      </div>`).join('');
+  }
+
+  drawChart();
+  drawDashLevelsChart();
+}
+
+// Pharmacokinetic model
+const PK = {
+  halfLife: 144,
+  tmax: 36,
+  ke: Math.LN2 / 144,
+  ka: 0.077,
+  bioavailability: 0.95,
+};
+
+function pkAmount(doseAmount, hoursAfterDose) {
+  if (hoursAfterDose < 0) return 0;
+  const t = hoursAfterDose;
+  const { ka, ke, bioavailability: F } = PK;
+  return F * doseAmount * (ka / (ka - ke)) * (Math.exp(-ke * t) - Math.exp(-ka * t));
+}
+
+function computePlasmaLevels(doses, startTime, endTime, stepMs) {
+  const points = [];
+  for (let t = startTime; t <= endTime; t += stepMs) {
+    let total = 0;
+    for (const dose of doses) {
+      const hoursAfter = (t - doseTimestamp(dose)) / (1000 * 60 * 60);
+      total += pkAmount(dose.amount, hoursAfter);
+    }
+    points.push({ time: t, level: total });
+  }
+  return points;
+}
+
+let levelsRange = 30;
+
+function renderLevels() {
+  const doses = getDoses();
+
+  if (!doses.length) {
+    document.getElementById('stat-current-level').textContent = '--';
+    document.getElementById('stat-steady-state').textContent = '--';
+    document.getElementById('stat-time-to-peak').textContent = '--';
+    document.getElementById('stat-next-dose').textContent = '--';
+    drawLevelsChart();
+    return;
+  }
+
+  const now = Date.now();
+  const lastDose = doses[doses.length - 1];
+  const lastDoseTime = doseTimestamp(lastDose);
+  const hoursSinceLastDose = (now - lastDoseTime) / (1000 * 60 * 60);
+
+  let currentLevel = 0;
+  for (const dose of doses) {
+    const hoursAfter = (now - doseTimestamp(dose)) / (1000 * 60 * 60);
+    currentLevel += pkAmount(dose.amount, hoursAfter);
+  }
+
+  document.getElementById('stat-current-level').textContent = currentLevel.toFixed(2);
+
+  const sameDoseDoses = doses.filter(d => d.amount === lastDose.amount);
+  const weeksAtCurrentDose = sameDoseDoses.length;
+  if (weeksAtCurrentDose >= 5) {
+    document.getElementById('stat-steady-state').textContent = 'Yes';
+  } else {
+    document.getElementById('stat-steady-state').textContent = `${weeksAtCurrentDose}/5 wks`;
+  }
+
+  if (hoursSinceLastDose < PK.tmax) {
+    const hrsLeft = Math.round(PK.tmax - hoursSinceLastDose);
+    if (hrsLeft > 24) {
+      document.getElementById('stat-time-to-peak').textContent = `${Math.round(hrsLeft / 24)}d ${hrsLeft % 24}h`;
+    } else {
+      document.getElementById('stat-time-to-peak').textContent = `${hrsLeft}h`;
+    }
+  } else {
+    document.getElementById('stat-time-to-peak').textContent = 'Peaked';
+  }
+
+  const nextDoseTime = lastDoseTime + 7 * 24 * 3600000;
+  const hoursUntilNext = (nextDoseTime - now) / (1000 * 60 * 60);
+  if (hoursUntilNext > 0) {
+    const days = Math.floor(hoursUntilNext / 24);
+    const hrs = Math.round(hoursUntilNext % 24);
+    document.getElementById('stat-next-dose').textContent = days > 0 ? `${days}d ${hrs}h` : `${hrs}h`;
+  } else {
+    document.getElementById('stat-next-dose').textContent = 'Due';
+  }
+
+  drawLevelsChart();
+}
+
+function drawDashLevelsChart() {
+  drawLevelsChart('dash-levels-chart', 30);
+}
+
+function drawLevelsChart(canvasId, rangeOverride) {
+  const canvas = document.getElementById(canvasId || 'levels-chart');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  ctx.scale(dpr, dpr);
+
+  const width = rect.width;
+  const height = rect.height;
+  const pad = { top: 52, right: 16, bottom: 32, left: 48 };
+
+  ctx.clearRect(0, 0, width, height);
+
+  const doses = getDoses();
+  if (!doses.length) {
+    ctx.fillStyle = '#8b8d98';
+    ctx.font = '14px -apple-system, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Log doses to see plasma level estimates', width / 2, height / 2);
+    return;
+  }
+
+  const now = Date.now();
+  const firstDoseTime = doseTimestamp(doses[0]);
+
+  const range = rangeOverride !== undefined ? rangeOverride : levelsRange;
+  const earliest = firstDoseTime - 24 * 3600000;
+  let chartStart, chartEnd;
+  if (range === 'all') {
+    chartStart = earliest;
+    chartEnd = now + 3 * 24 * 3600000;
+  } else {
+    chartStart = Math.max(earliest, now - range * 24 * 3600000);
+    chartEnd = now + 3 * 24 * 3600000;
+  }
+
+  const relevantDoses = doses.filter(d => {
+    const dt = doseTimestamp(d);
+    return dt <= chartEnd && (chartStart - dt) < 30 * 24 * 3600000;
+  });
+
+  const stepMs = Math.max(3600000, Math.round((chartEnd - chartStart) / 200));
+  const points = computePlasmaLevels(relevantDoses, chartStart, chartEnd, stepMs);
+
+  if (!points.length) return;
+
+  const levels = points.map(p => p.level);
+  const maxLevel = Math.max(...levels);
+  if (maxLevel === 0) return;
+
+  const chartW = width - pad.left - pad.right;
+  const chartH = height - pad.top - pad.bottom;
+
+  const xScale = t => pad.left + ((t - chartStart) / (chartEnd - chartStart)) * chartW;
+  const yMax = maxLevel * 1.15;
+  const yScale = v => pad.top + chartH - (v / yMax) * chartH;
+
+  // Grid lines
+  ctx.strokeStyle = '#2e3140';
+  ctx.lineWidth = 1;
+  const gridLines = 5;
+  for (let i = 0; i <= gridLines; i++) {
+    const y = pad.top + (i / gridLines) * chartH;
+    ctx.beginPath();
+    ctx.moveTo(pad.left, y);
+    ctx.lineTo(width - pad.right, y);
+    ctx.stroke();
+
+    const val = yMax * (1 - i / gridLines);
+    ctx.fillStyle = '#8b8d98';
+    ctx.font = '11px -apple-system, sans-serif';
+    ctx.textAlign = 'right';
+    ctx.fillText(`${val.toFixed(1)}`, pad.left - 8, y + 4);
+  }
+  ctx.fillStyle = '#8b8d98';
+  ctx.font = '10px -apple-system, sans-serif';
+  ctx.textAlign = 'right';
+  ctx.fillText('mg', pad.left - 8, pad.top - 6);
+
+  // X labels
+  const totalDays = (chartEnd - chartStart) / (1000 * 60 * 60 * 24);
+  const labelCount = Math.min(6, Math.ceil(totalDays / 7));
+  ctx.fillStyle = '#8b8d98';
+  ctx.font = '11px -apple-system, sans-serif';
+  ctx.textAlign = 'center';
+  for (let i = 0; i < labelCount; i++) {
+    const t = chartStart + (i / (labelCount - 1)) * (chartEnd - chartStart);
+    const d = new Date(t);
+    ctx.fillText(formatDateShort(d.toISOString().split('T')[0]), xScale(t), height - 8);
+  }
+
+  // Dose markers with labels
+  for (const dose of relevantDoses) {
+    const doseTime = doseTimestamp(dose);
+    if (doseTime >= chartStart && doseTime <= chartEnd) {
+      const x = xScale(doseTime);
+      ctx.setLineDash([3, 3]);
+      ctx.beginPath();
+      ctx.moveTo(x, pad.top);
+      ctx.lineTo(x, pad.top + chartH);
+      ctx.strokeStyle = 'rgba(253, 203, 110, 0.3)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      ctx.beginPath();
+      ctx.moveTo(x - 4, pad.top);
+      ctx.lineTo(x + 4, pad.top);
+      ctx.lineTo(x, pad.top + 6);
+      ctx.closePath();
+      ctx.fillStyle = '#fdcb6e';
+      ctx.fill();
+
+      // Dose label
+      const dLabel = `${dose.amount}mg`;
+      ctx.font = '10px -apple-system, sans-serif';
+      ctx.textAlign = 'center';
+      const dlW = ctx.measureText(dLabel).width + 8;
+      const dlX = x - dlW / 2;
+      const dlY = pad.top + 10;
+      ctx.fillStyle = 'rgba(253, 203, 110, 0.15)';
+      ctx.beginPath();
+      ctx.roundRect(dlX, dlY, dlW, 16, 3);
+      ctx.fill();
+      ctx.fillStyle = '#fdcb6e';
+      ctx.fillText(dLabel, x, dlY + 12);
+    }
+  }
+
+  // "Now" line with level callout
+  if (now >= chartStart && now <= chartEnd) {
+    const nowX = xScale(now);
+
+    // Compute current level at "now"
+    let nowLevel = 0;
+    for (const dose of relevantDoses) {
+      const hoursAfter = (now - doseTimestamp(dose)) / (1000 * 60 * 60);
+      nowLevel += pkAmount(dose.amount, hoursAfter);
+    }
+    const nowY = yScale(nowLevel);
+
+    // Vertical line
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath();
+    ctx.moveTo(nowX, pad.top);
+    ctx.lineTo(nowX, pad.top + chartH);
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Dot on the curve
+    ctx.beginPath();
+    ctx.arc(nowX, nowY, 4, 0, Math.PI * 2);
+    ctx.fillStyle = '#00b894';
+    ctx.fill();
+    ctx.strokeStyle = '#0f1117';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Translucent label with mg and date/time
+    const levelStr = nowLevel.toFixed(2) + 'mg';
+    const nowDate = new Date(now);
+    const dateStr = nowDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    const timeStr = nowDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+    const fullStr = dateStr + ' at ' + timeStr;
+
+    ctx.font = 'bold 12px -apple-system, sans-serif';
+    const levelW = ctx.measureText(levelStr).width;
+    ctx.font = '10px -apple-system, sans-serif';
+    const dateW = ctx.measureText(fullStr).width;
+    const boxW = Math.max(levelW, dateW) + 16;
+    const boxH = 36;
+
+    // Position label above the chart, centered on the now line
+    let boxX = nowX - boxW / 2;
+    if (boxX < pad.left) boxX = pad.left;
+    if (boxX + boxW > width - pad.right) boxX = width - pad.right - boxW;
+    const boxY = pad.top - boxH - 6;
+
+    ctx.fillStyle = 'rgba(26, 29, 39, 0.85)';
+    ctx.beginPath();
+    ctx.roundRect(boxX, boxY, boxW, boxH, 6);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    ctx.textAlign = 'left';
+    ctx.font = 'bold 12px -apple-system, sans-serif';
+    ctx.fillStyle = '#e4e5ea';
+    ctx.fillText(levelStr, boxX + 8, boxY + 14);
+    ctx.font = '10px -apple-system, sans-serif';
+    ctx.fillStyle = '#8b8d98';
+    ctx.fillText(fullStr, boxX + 8, boxY + 28);
+  }
+
+  // Split points at "now" for solid vs projected
+  const pastPoints = points.filter(p => p.time <= now);
+  const futurePoints = points.filter(p => p.time >= now);
+
+  // Area fill (past only - solid)
+  if (pastPoints.length > 1) {
+    const gradient = ctx.createLinearGradient(0, pad.top, 0, pad.top + chartH);
+    gradient.addColorStop(0, 'rgba(0, 184, 148, 0.25)');
+    gradient.addColorStop(1, 'rgba(0, 184, 148, 0.0)');
+    ctx.beginPath();
+    ctx.moveTo(xScale(pastPoints[0].time), yScale(pastPoints[0].level));
+    for (let i = 1; i < pastPoints.length; i++) {
+      ctx.lineTo(xScale(pastPoints[i].time), yScale(pastPoints[i].level));
+    }
+    ctx.lineTo(xScale(pastPoints[pastPoints.length - 1].time), pad.top + chartH);
+    ctx.lineTo(xScale(pastPoints[0].time), pad.top + chartH);
+    ctx.closePath();
+    ctx.fillStyle = gradient;
+    ctx.fill();
+  }
+
+  // Future area fill (lighter)
+  if (futurePoints.length > 1) {
+    const gradientF = ctx.createLinearGradient(0, pad.top, 0, pad.top + chartH);
+    gradientF.addColorStop(0, 'rgba(0, 184, 148, 0.10)');
+    gradientF.addColorStop(1, 'rgba(0, 184, 148, 0.0)');
+    ctx.beginPath();
+    ctx.moveTo(xScale(futurePoints[0].time), yScale(futurePoints[0].level));
+    for (let i = 1; i < futurePoints.length; i++) {
+      ctx.lineTo(xScale(futurePoints[i].time), yScale(futurePoints[i].level));
+    }
+    ctx.lineTo(xScale(futurePoints[futurePoints.length - 1].time), pad.top + chartH);
+    ctx.lineTo(xScale(futurePoints[0].time), pad.top + chartH);
+    ctx.closePath();
+    ctx.fillStyle = gradientF;
+    ctx.fill();
+  }
+
+  // Solid line (past)
+  if (pastPoints.length > 1) {
+    ctx.beginPath();
+    ctx.moveTo(xScale(pastPoints[0].time), yScale(pastPoints[0].level));
+    for (let i = 1; i < pastPoints.length; i++) {
+      ctx.lineTo(xScale(pastPoints[i].time), yScale(pastPoints[i].level));
+    }
+    ctx.strokeStyle = '#00b894';
+    ctx.lineWidth = 2;
+    ctx.lineJoin = 'round';
+    ctx.setLineDash([]);
+    ctx.stroke();
+  }
+
+  // Dashed line (projected future)
+  if (futurePoints.length > 1) {
+    ctx.beginPath();
+    ctx.moveTo(xScale(futurePoints[0].time), yScale(futurePoints[0].level));
+    for (let i = 1; i < futurePoints.length; i++) {
+      ctx.lineTo(xScale(futurePoints[i].time), yScale(futurePoints[i].level));
+    }
+    ctx.strokeStyle = '#00b894';
+    ctx.lineWidth = 2;
+    ctx.lineJoin = 'round';
+    ctx.setLineDash([6, 4]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+}
+
+document.querySelectorAll('.levels-range').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.levels-range').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    levelsRange = btn.dataset.range === 'all' ? 'all' : parseInt(btn.dataset.range);
+    drawLevelsChart();
+  });
+});
+
+// Export / Import
+document.getElementById('export-btn').addEventListener('click', () => {
+  const data = {
+    weights: getWeights(),
+    doses: getDoses(),
+    protocol: getProtocol(),
+    exportedAt: new Date().toISOString(),
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  const profileName = (getActiveProfile()?.name || 'export').toLowerCase().replace(/\s+/g, '-');
+  a.download = `peptide-tracker-${profileName}-${todayStr()}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('Data exported');
+});
+
+document.getElementById('import-input').addEventListener('change', async e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  try {
+    const text = await file.text();
+    const data = JSON.parse(text);
+    if (data.weights) save(STORAGE_KEYS.weights, data.weights);
+    if (data.doses) save(STORAGE_KEYS.doses, data.doses);
+    if (data.protocol) save(STORAGE_KEYS.protocol, data.protocol);
+    showToast('Data imported successfully');
+    renderDashboard();
+    renderWeightHistory();
+    renderDoseHistory();
+    renderProtocol();
+  } catch {
+    showToast('Invalid file format', 'error');
+  }
+  e.target.value = '';
+});
+
+// Resize chart on window resize
+window.addEventListener('resize', () => {
+  drawChart();
+  drawLevelsChart();
+  drawDashLevelsChart();
+});
+
+// Initial render
+function initApp() {
+  loadProtocolForm();
+  updateSiteSuggestion();
+  renderDashboard();
+  renderWeightHistory();
+  renderDoseHistory();
+  renderLevels();
+  renderProtocol();
+}
+if (getActiveProfileId()) initApp();
+  </script>
+</body>
+</html>

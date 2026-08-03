@@ -1479,6 +1479,22 @@ nav {
             </div>
             <input type="number" id="calc-bac-custom" step="0.1" min="0.1" max="20" placeholder="Or enter custom (ml)">
           </div>
+          <div class="form-group">
+            <label>Filter Loss</label>
+            <div class="calc-preset-grid" id="calc-filter" style="grid-template-columns: repeat(2, 1fr);">
+              <button class="calc-preset selected" data-val="0">None</button>
+              <button class="calc-preset" data-val="1">0.22μm Filter</button>
+            </div>
+            <div id="filter-options" style="display:none;margin-top:8px;">
+              <label style="font-size:12px;color:var(--text-muted);">Dead volume lost in filter (ml)</label>
+              <div class="calc-preset-grid" id="calc-filter-loss">
+                <button class="calc-preset selected" data-val="0.05">0.05 ml</button>
+                <button class="calc-preset" data-val="0.1">0.1 ml</button>
+                <button class="calc-preset" data-val="0.15">0.15 ml</button>
+              </div>
+              <input type="number" id="calc-filter-custom" step="0.01" min="0.01" max="1" placeholder="Or enter custom (ml)">
+            </div>
+          </div>
           <div class="form-group" id="syringe-only-options" style="display:none;">
             <label>Syringe Size</label>
             <div class="calc-preset-grid" id="calc-syringe">
@@ -2762,7 +2778,7 @@ document.querySelectorAll('.levels-range').forEach(btn => {
 });
 
 // Reconstitution Calculator
-const calcState = { peptideAmt: 10, bacWater: 1, syringeUnits: 100, dose: 2 };
+const calcState = { peptideAmt: 10, bacWater: 1, syringeUnits: 100, dose: 2, filterLoss: 0 };
 
 function setupCalcPresets(containerId, stateKey) {
   const container = document.getElementById(containerId);
@@ -2782,6 +2798,31 @@ setupCalcPresets('calc-peptide-amt', 'peptideAmt');
 setupCalcPresets('calc-bac-water', 'bacWater');
 setupCalcPresets('calc-syringe', 'syringeUnits');
 setupCalcPresets('calc-dose', 'dose');
+setupCalcPresets('calc-filter-loss', 'filterLoss');
+
+document.getElementById('calc-filter').querySelectorAll('.calc-preset').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.getElementById('calc-filter').querySelectorAll('.calc-preset').forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
+    const useFilter = btn.dataset.val === '1';
+    document.getElementById('filter-options').style.display = useFilter ? '' : 'none';
+    calcState.filterLoss = useFilter ? 0.05 : 0;
+    if (useFilter) {
+      document.getElementById('calc-filter-loss').querySelectorAll('.calc-preset').forEach(b => b.classList.remove('selected'));
+      document.getElementById('calc-filter-loss').querySelector('[data-val="0.05"]').classList.add('selected');
+    }
+    updateCalc();
+  });
+});
+
+document.getElementById('calc-filter-custom').addEventListener('input', e => {
+  const val = parseFloat(e.target.value);
+  if (!isNaN(val) && val > 0) {
+    document.getElementById('calc-filter-loss').querySelectorAll('.calc-preset').forEach(b => b.classList.remove('selected'));
+    calcState.filterLoss = val;
+    updateCalc();
+  }
+});
 
 document.getElementById('calc-peptide-custom').addEventListener('input', e => {
   const val = parseFloat(e.target.value);
@@ -2811,14 +2852,31 @@ document.getElementById('calc-dose-custom').addEventListener('input', e => {
 });
 
 function updateCalc() {
-  const { peptideAmt, bacWater, syringeUnits, dose } = calcState;
-  const concentration = peptideAmt / bacWater;
+  const { peptideAmt, bacWater, syringeUnits, dose, filterLoss } = calcState;
+  const effectiveVolume = bacWater - filterLoss;
+  const lostMg = filterLoss > 0 ? (filterLoss / bacWater) * peptideAmt : 0;
+  const effectivePeptide = peptideAmt - lostMg;
+  const concentration = effectivePeptide / effectiveVolume;
   const volumeToDrawMl = dose / concentration;
   const syringeMl = syringeUnits / 100;
   const unitsToDraw = Math.round(volumeToDrawMl * 100);
-  const dosesPerVial = Math.floor(peptideAmt / dose);
-  const pctUsed = (volumeToDrawMl / bacWater) * 100;
+  const dosesPerVial = Math.floor(effectivePeptide / dose);
+  const pctUsed = (volumeToDrawMl / effectiveVolume) * 100;
   const pctRemaining = Math.max(0, 100 - pctUsed);
+
+  const filterNote = document.getElementById('calc-filter-note');
+  if (filterLoss > 0) {
+    if (!filterNote) {
+      const note = document.createElement('div');
+      note.id = 'calc-filter-note';
+      note.className = 'calc-formula-item';
+      note.innerHTML = '<div class="calc-formula-label">Filter Loss</div><div class="calc-formula-value" style="color:var(--red);" id="calc-filter-val"></div>';
+      document.getElementById('calc-formula').appendChild(note);
+    }
+    document.getElementById('calc-filter-val').textContent = `-${lostMg.toFixed(2)} mg (${filterLoss} ml)`;
+  } else if (filterNote) {
+    filterNote.remove();
+  }
 
   const tooLarge = unitsToDraw > syringeUnits;
 

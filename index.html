@@ -1014,6 +1014,135 @@ nav {
   color: var(--text-muted);
 }
 
+/* Calculator */
+.calc-preset-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.calc-preset {
+  padding: 10px;
+  background: var(--bg-input);
+  border: 2px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.2s;
+}
+
+.calc-preset.selected {
+  border-color: var(--accent);
+  background: rgba(108, 92, 231, 0.15);
+  color: var(--accent);
+}
+
+.calc-result {
+  background: var(--bg-card);
+  border-radius: var(--radius);
+  padding: 20px;
+  margin-top: 16px;
+  border: 1px solid var(--green);
+}
+
+.calc-result-main {
+  text-align: center;
+  margin-bottom: 16px;
+}
+
+.calc-result-units {
+  font-size: 48px;
+  font-weight: 700;
+  color: var(--green);
+  letter-spacing: -2px;
+}
+
+.calc-result-units span {
+  font-size: 24px;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.calc-result-instruction {
+  font-size: 15px;
+  color: var(--text);
+  margin-top: 4px;
+}
+
+.calc-result-dose {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.calc-formula {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.calc-formula-item {
+  text-align: center;
+  padding: 8px;
+  background: var(--bg-input);
+  border-radius: var(--radius-sm);
+}
+
+.calc-formula-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.calc-formula-value {
+  font-size: 16px;
+  font-weight: 600;
+  margin-top: 2px;
+}
+
+.calc-formula-value.highlight {
+  color: var(--green);
+}
+
+.calc-syringe {
+  margin: 16px 0;
+  padding: 12px;
+  background: var(--bg-input);
+  border-radius: var(--radius-sm);
+}
+
+.syringe-bar {
+  position: relative;
+  height: 24px;
+  background: var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-top: 8px;
+}
+
+.syringe-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 4px;
+  transition: width 0.3s;
+}
+
+.syringe-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
 @media (max-width: 480px) {
   .stats-row {
     grid-template-columns: repeat(2, 1fr);
@@ -1057,6 +1186,7 @@ nav {
         <button class="nav-btn" data-view="weight">Weight</button>
         <button class="nav-btn" data-view="doses">Doses</button>
         <button class="nav-btn" data-view="levels">Levels</button>
+        <button class="nav-btn" data-view="calc">Calc</button>
         <button class="nav-btn" data-view="protocol">Protocol</button>
       </nav>
     </header>
@@ -1312,6 +1442,138 @@ nav {
             </div>
           </div>
           <p class="pk-disclaimer">PK model based on Jastreboff et al., N Engl J Med 2023;389:514-26 (Phase 2 TRIUMPH trial) and Urva et al., Lancet 2022;400:1869-81 (Phase 1b). Individual levels vary with metabolism, injection site, and body composition. Not a substitute for lab monitoring.</p>
+        </div>
+      </section>
+
+      <!-- Calculator View -->
+      <section id="view-calc" class="view">
+        <div class="form-card">
+          <h2>Dose Calculator</h2>
+          <div class="form-group">
+            <label>Device</label>
+            <div class="calc-preset-grid" id="calc-device" style="grid-template-columns: repeat(2, 1fr);">
+              <button class="calc-preset" data-val="syringe">Syringe</button>
+              <button class="calc-preset selected" data-val="pen">Pen</button>
+            </div>
+          </div>
+          <div id="syringe-only-options" style="display:none;">
+            <div class="form-group">
+              <label>Vial Size</label>
+              <div class="calc-preset-grid" id="calc-vial-size">
+                <button class="calc-preset" data-val="2">2 ml</button>
+                <button class="calc-preset selected" data-val="3">3 ml</button>
+                <button class="calc-preset" data-val="5">5 ml</button>
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Peptide Amount (mg in vial)</label>
+              <div class="calc-preset-grid" id="calc-peptide-amt">
+                <button class="calc-preset" data-val="5">5 mg</button>
+                <button class="calc-preset selected" data-val="10">10 mg</button>
+                <button class="calc-preset" data-val="15">15 mg</button>
+                <button class="calc-preset" data-val="20">20 mg</button>
+                <button class="calc-preset" data-val="30">30 mg</button>
+                <button class="calc-preset" data-val="50">50 mg</button>
+              </div>
+              <input type="number" id="calc-peptide-custom" step="0.1" min="1" max="2000" placeholder="Or enter custom (mg)">
+            </div>
+            <div class="form-group">
+              <label>BAC Water Added (ml)</label>
+              <div class="calc-preset-grid" id="calc-bac-water">
+                <button class="calc-preset selected" data-val="1">1 ml</button>
+                <button class="calc-preset" data-val="1.5">1.5 ml</button>
+                <button class="calc-preset" data-val="2">2 ml</button>
+                <button class="calc-preset" data-val="2.5">2.5 ml</button>
+                <button class="calc-preset" data-val="3">3 ml</button>
+              </div>
+              <input type="number" id="calc-bac-custom" step="0.1" min="0.1" max="20" placeholder="Or enter custom (ml)">
+            </div>
+            <div class="form-group">
+              <label>Syringe Size</label>
+              <div class="calc-preset-grid" id="calc-syringe">
+                <button class="calc-preset" data-val="30">0.3 ml (30u)</button>
+                <button class="calc-preset" data-val="50">0.5 ml (50u)</button>
+                <button class="calc-preset selected" data-val="100">1.0 ml (100u)</button>
+              </div>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Desired Dose (mg)</label>
+            <div class="calc-preset-grid" id="calc-dose">
+              <button class="calc-preset selected" data-val="2">2 mg</button>
+              <button class="calc-preset" data-val="4">4 mg</button>
+              <button class="calc-preset" data-val="8">8 mg</button>
+              <button class="calc-preset" data-val="12">12 mg</button>
+            </div>
+            <input type="number" id="calc-dose-custom" step="0.1" min="0.1" max="100" placeholder="Or enter custom (mg)">
+          </div>
+        </div>
+
+        <div class="calc-result" id="calc-result">
+          <div class="calc-result-main">
+            <div class="calc-result-units" id="calc-units">20<span>u</span></div>
+            <div class="calc-result-instruction" id="calc-instruction">Pull plunger to the 20u mark</div>
+            <div class="calc-result-dose" id="calc-dose-label">That's your 2.00mg dose</div>
+          </div>
+          <div class="calc-syringe">
+            <div style="font-size:12px;color:var(--text-muted);margin-bottom:4px;">Syringe (100u)</div>
+            <div class="syringe-bar">
+              <div class="syringe-fill" id="calc-syringe-fill" style="width:20%"></div>
+            </div>
+            <div class="syringe-labels">
+              <span>0u</span>
+              <span id="calc-syringe-max">100u</span>
+            </div>
+          </div>
+          <div class="calc-formula" id="calc-formula">
+            <div class="calc-formula-item">
+              <div class="calc-formula-label">Concentration</div>
+              <div class="calc-formula-value highlight" id="calc-conc">10.00 mg/ml</div>
+            </div>
+            <div class="calc-formula-item">
+              <div class="calc-formula-label">Volume to Draw</div>
+              <div class="calc-formula-value highlight" id="calc-vol">0.20 ml</div>
+            </div>
+            <div class="calc-formula-item">
+              <div class="calc-formula-label">Doses per Vial</div>
+              <div class="calc-formula-value" id="calc-doses-avail">5</div>
+            </div>
+            <div class="calc-formula-item">
+              <div class="calc-formula-label">Vial Remaining</div>
+              <div class="calc-formula-value" id="calc-remaining">80%</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+        <div class="form-card" style="margin-top:16px;">
+          <h2>Pen / Vial Tracker</h2>
+          <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px;">Track how much is left in your current pen or vial.</p>
+          <div class="form-group">
+            <label>Total Amount (mg)</label>
+            <input type="number" id="pen-total" step="0.1" min="1" placeholder="e.g. 10" value="">
+          </div>
+          <div class="form-group">
+            <label>Remaining (mg)</label>
+            <input type="number" id="pen-remaining" step="0.1" min="0" placeholder="e.g. 8" value="">
+          </div>
+          <div style="display:flex;gap:8px;">
+            <button class="btn-primary" id="pen-save-btn" style="flex:1;">Save</button>
+            <button class="btn-secondary" id="pen-use-dose-btn" style="flex:1;">Use Dose</button>
+          </div>
+          <div id="pen-status" style="margin-top:12px;display:none;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+              <span style="font-size:14px;font-weight:600;">Pen Status</span>
+              <span style="font-size:13px;color:var(--text-muted);" id="pen-status-label"></span>
+            </div>
+            <div class="progress-bar-container">
+              <div class="progress-bar" id="pen-progress-bar" style="background:var(--green);"></div>
+            </div>
+            <div style="display:flex;justify-content:space-between;margin-top:6px;font-size:12px;color:var(--text-muted);">
+              <span id="pen-doses-left"></span>
+              <span id="pen-mg-left"></span>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -1592,6 +1854,7 @@ document.querySelectorAll('.nav-btn').forEach(btn => {
     if (btn.dataset.view === 'weight') renderWeightHistory();
     if (btn.dataset.view === 'doses') renderDoseHistory();
     if (btn.dataset.view === 'levels') renderLevels();
+    if (btn.dataset.view === 'calc') updateCalc();
     if (btn.dataset.view === 'protocol') renderProtocol();
   });
 });
@@ -2508,6 +2771,175 @@ document.querySelectorAll('.levels-range').forEach(btn => {
   });
 });
 
+// Reconstitution Calculator
+const calcState = { vialSize: 3, peptideAmt: 10, bacWater: 1, syringeUnits: 100, dose: 2 };
+
+function setupCalcPresets(containerId, stateKey) {
+  const container = document.getElementById(containerId);
+  container.querySelectorAll('.calc-preset').forEach(btn => {
+    btn.addEventListener('click', () => {
+      container.querySelectorAll('.calc-preset').forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+      calcState[stateKey] = parseFloat(btn.dataset.val);
+      const customInput = container.parentElement.querySelector('input[type="number"]');
+      if (customInput) customInput.value = '';
+      updateCalc();
+    });
+  });
+}
+
+setupCalcPresets('calc-vial-size', 'vialSize');
+setupCalcPresets('calc-peptide-amt', 'peptideAmt');
+setupCalcPresets('calc-bac-water', 'bacWater');
+setupCalcPresets('calc-syringe', 'syringeUnits');
+setupCalcPresets('calc-dose', 'dose');
+
+document.getElementById('calc-peptide-custom').addEventListener('input', e => {
+  const val = parseFloat(e.target.value);
+  if (!isNaN(val) && val > 0) {
+    document.getElementById('calc-peptide-amt').querySelectorAll('.calc-preset').forEach(b => b.classList.remove('selected'));
+    calcState.peptideAmt = val;
+    updateCalc();
+  }
+});
+
+document.getElementById('calc-bac-custom').addEventListener('input', e => {
+  const val = parseFloat(e.target.value);
+  if (!isNaN(val) && val > 0) {
+    document.getElementById('calc-bac-water').querySelectorAll('.calc-preset').forEach(b => b.classList.remove('selected'));
+    calcState.bacWater = val;
+    updateCalc();
+  }
+});
+
+document.getElementById('calc-dose-custom').addEventListener('input', e => {
+  const val = parseFloat(e.target.value);
+  if (!isNaN(val) && val > 0) {
+    document.getElementById('calc-dose').querySelectorAll('.calc-preset').forEach(b => b.classList.remove('selected'));
+    calcState.dose = val;
+    updateCalc();
+  }
+});
+
+function updateCalc() {
+  const { peptideAmt, bacWater, syringeUnits, dose } = calcState;
+  const concentration = peptideAmt / bacWater;
+  const volumeToDrawMl = dose / concentration;
+  const syringeMl = syringeUnits / 100;
+  const unitsToDraw = Math.round(volumeToDrawMl * 100);
+  const dosesPerVial = Math.floor(peptideAmt / dose);
+  const pctUsed = (volumeToDrawMl / bacWater) * 100;
+  const pctRemaining = Math.max(0, 100 - pctUsed);
+
+  const tooLarge = unitsToDraw > syringeUnits;
+
+  const isPen = calcState.device === 'pen';
+
+  if (isPen) {
+    document.getElementById('calc-units').innerHTML = `${dose}<span>mg</span>`;
+    document.getElementById('calc-instruction').textContent = `Dial pen to ${dose}mg`;
+    document.getElementById('calc-dose-label').textContent = `${dosesPerVial} doses available from this pen`;
+  } else {
+    document.getElementById('calc-units').innerHTML = tooLarge
+      ? `--<span>u</span>`
+      : `${unitsToDraw}<span>u</span>`;
+    document.getElementById('calc-instruction').textContent = tooLarge
+      ? `Dose exceeds syringe capacity (${syringeUnits}u)`
+      : `Pull plunger to the ${unitsToDraw}u mark`;
+    document.getElementById('calc-dose-label').textContent = tooLarge
+      ? 'Try more BAC water or a larger syringe'
+      : `That's your ${dose.toFixed(2)}mg dose`;
+  }
+
+  document.getElementById('calc-conc').textContent = concentration.toFixed(2) + ' mg/ml';
+  document.getElementById('calc-vol').textContent = volumeToDrawMl.toFixed(2) + ' ml';
+  document.getElementById('calc-doses-avail').textContent = dosesPerVial;
+  document.getElementById('calc-remaining').textContent = pctRemaining.toFixed(0) + '%';
+
+  document.getElementById('calc-conc').parentElement.style.display = isPen ? 'none' : '';
+  document.getElementById('calc-vol').parentElement.style.display = isPen ? 'none' : '';
+
+  renderPenStatus();
+
+  const syringeViz = document.querySelector('.calc-syringe');
+  if (isPen) {
+    syringeViz.style.display = 'none';
+    document.getElementById('calc-result').style.borderColor = 'var(--green)';
+  } else {
+    syringeViz.style.display = '';
+    const fillPct = tooLarge ? 100 : (unitsToDraw / syringeUnits) * 100;
+    document.getElementById('calc-syringe-fill').style.width = fillPct + '%';
+    document.getElementById('calc-syringe-fill').style.background = tooLarge ? 'var(--red)' : 'var(--accent)';
+    document.getElementById('calc-syringe-max').textContent = syringeUnits + 'u';
+    syringeViz.querySelector('div:first-child').textContent = `Syringe (${syringeUnits}u)`;
+    document.getElementById('calc-result').style.borderColor = tooLarge ? 'var(--red)' : 'var(--green)';
+  }
+}
+
+// Device toggle
+calcState.device = 'pen';
+document.getElementById('calc-device').querySelectorAll('.calc-preset').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.getElementById('calc-device').querySelectorAll('.calc-preset').forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
+    calcState.device = btn.dataset.val;
+    document.getElementById('syringe-only-options').style.display = calcState.device === 'syringe' ? '' : 'none';
+    updateCalc();
+  });
+});
+
+updateCalc();
+
+// Pen/Vial tracker
+function getPenData() {
+  try { return JSON.parse(localStorage.getItem('pt_pen_' + getActiveProfileId())) || null; } catch { return null; }
+}
+
+function savePenData(data) {
+  localStorage.setItem('pt_pen_' + getActiveProfileId(), JSON.stringify(data));
+}
+
+function renderPenStatus() {
+  const pen = getPenData();
+  const statusEl = document.getElementById('pen-status');
+  if (!pen) { statusEl.style.display = 'none'; return; }
+
+  statusEl.style.display = '';
+  document.getElementById('pen-total').value = pen.total;
+  document.getElementById('pen-remaining').value = pen.remaining;
+
+  const pct = (pen.remaining / pen.total) * 100;
+  document.getElementById('pen-progress-bar').style.width = pct + '%';
+  document.getElementById('pen-progress-bar').style.background = pct < 20 ? 'var(--red)' : pct < 40 ? 'var(--orange)' : 'var(--green)';
+  document.getElementById('pen-status-label').textContent = pct.toFixed(0) + '% remaining';
+  document.getElementById('pen-mg-left').textContent = pen.remaining.toFixed(1) + ' mg left';
+
+  const dosesLeft = Math.floor(pen.remaining / calcState.dose);
+  document.getElementById('pen-doses-left').textContent = dosesLeft + ' dose' + (dosesLeft !== 1 ? 's' : '') + ' left at ' + calcState.dose + 'mg';
+}
+
+document.getElementById('pen-save-btn').addEventListener('click', () => {
+  const total = parseFloat(document.getElementById('pen-total').value);
+  const remaining = parseFloat(document.getElementById('pen-remaining').value);
+  if (isNaN(total) || isNaN(remaining) || total <= 0) { showToast('Enter total and remaining', 'error'); return; }
+  savePenData({ total, remaining });
+  renderPenStatus();
+  showToast('Pen saved');
+});
+
+document.getElementById('pen-use-dose-btn').addEventListener('click', () => {
+  const pen = getPenData();
+  if (!pen) { showToast('Save pen data first', 'error'); return; }
+  const newRemaining = pen.remaining - calcState.dose;
+  if (newRemaining < 0) { showToast('Not enough left for this dose', 'error'); return; }
+  pen.remaining = parseFloat(newRemaining.toFixed(1));
+  savePenData(pen);
+  renderPenStatus();
+  showToast(`Used ${calcState.dose}mg — ${pen.remaining}mg left`);
+});
+
+renderPenStatus();
+
 // Export / Import
 document.getElementById('export-btn').addEventListener('click', () => {
   const data = {
@@ -2563,6 +2995,7 @@ function initApp() {
   renderDoseHistory();
   renderLevels();
   renderProtocol();
+  renderPenStatus();
 }
 if (getActiveProfileId()) initApp();
   </script>

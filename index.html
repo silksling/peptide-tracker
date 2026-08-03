@@ -1217,12 +1217,10 @@ nav {
               <label for="dose-site">Injection Site</label>
               <select id="dose-site">
                 <option value="">Select site</option>
-                <option value="abdomen-left">Abdomen (Left)</option>
-                <option value="abdomen-right">Abdomen (Right)</option>
-                <option value="thigh-left">Thigh (Left)</option>
-                <option value="thigh-right">Thigh (Right)</option>
-                <option value="arm-left">Upper Arm (Left)</option>
-                <option value="arm-right">Upper Arm (Right)</option>
+                <option value="abdomen-upper-left">Abdomen (Upper Left)</option>
+                <option value="abdomen-upper-right">Abdomen (Upper Right)</option>
+                <option value="abdomen-lower-left">Abdomen (Lower Left)</option>
+                <option value="abdomen-lower-right">Abdomen (Lower Right)</option>
               </select>
               <div class="site-suggestion" id="site-suggestion"></div>
             </div>
@@ -1627,11 +1625,10 @@ document.querySelectorAll('.side-effect-chip').forEach(chip => {
 });
 
 // Site rotation suggestion
-const SITE_ORDER = ['abdomen-left','abdomen-right','thigh-left','thigh-right','arm-left','arm-right'];
+const SITE_ORDER = ['abdomen-upper-left','abdomen-upper-right','abdomen-lower-left','abdomen-lower-right'];
 const SITE_LABELS = {
-  'abdomen-left': 'Abdomen (Left)', 'abdomen-right': 'Abdomen (Right)',
-  'thigh-left': 'Thigh (Left)', 'thigh-right': 'Thigh (Right)',
-  'arm-left': 'Upper Arm (Left)', 'arm-right': 'Upper Arm (Right)',
+  'abdomen-upper-left': 'Abdomen (Upper Left)', 'abdomen-upper-right': 'Abdomen (Upper Right)',
+  'abdomen-lower-left': 'Abdomen (Lower Left)', 'abdomen-lower-right': 'Abdomen (Lower Right)',
 };
 
 function updateSiteSuggestion() {
@@ -1760,12 +1757,12 @@ function renderDoseHistory() {
   }
 
   const siteLabels = {
+    'abdomen-upper-left': 'Abdomen (UL)',
+    'abdomen-upper-right': 'Abdomen (UR)',
+    'abdomen-lower-left': 'Abdomen (LL)',
+    'abdomen-lower-right': 'Abdomen (LR)',
     'abdomen-left': 'Abdomen (L)',
     'abdomen-right': 'Abdomen (R)',
-    'thigh-left': 'Thigh (L)',
-    'thigh-right': 'Thigh (R)',
-    'arm-left': 'Arm (L)',
-    'arm-right': 'Arm (R)',
   };
 
   const sorted = [...doses].reverse();

@@ -1308,7 +1308,8 @@ nav {
         <div class="chart-container">
           <h2>Weight Trend</h2>
           <div class="chart-controls">
-            <button class="chart-range active" data-range="30">30d</button>
+            <button class="chart-range active" data-range="7">7d</button>
+            <button class="chart-range" data-range="30">30d</button>
             <button class="chart-range" data-range="90">90d</button>
             <button class="chart-range" data-range="all">All</button>
           </div>
@@ -2236,7 +2237,7 @@ function renderProtocol() {
 }
 
 // Chart drawing
-let currentRange = 30;
+let currentRange = 7;
 
 function drawChart() {
   const canvas = document.getElementById('weight-chart');
@@ -2260,6 +2261,20 @@ function drawChart() {
     ctx.textAlign = 'center';
     ctx.fillText('Log weight entries to see your trend', width / 2, height / 2);
     return;
+  }
+
+  if (currentRange === 30) {
+    const spanDays = (new Date(weights[weights.length - 1].date + 'T00:00:00') - new Date(weights[0].date + 'T00:00:00')) / 86400000;
+    if (spanDays < 30) {
+      const daysLeft = Math.ceil(30 - spanDays);
+      ctx.fillStyle = '#8b8d98';
+      ctx.font = '14px -apple-system, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('Needs a full month of entries', width / 2, height / 2 - 10);
+      ctx.font = '12px -apple-system, sans-serif';
+      ctx.fillText(`${daysLeft} more day${daysLeft === 1 ? '' : 's'} to go — try the 7d view`, width / 2, height / 2 + 12);
+      return;
+    }
   }
 
   if (currentRange !== 'all') {

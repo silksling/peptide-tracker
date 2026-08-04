@@ -2317,15 +2317,23 @@ function drawChart() {
   ctx.fillStyle = '#8b8d98';
   ctx.font = '11px -apple-system, sans-serif';
   ctx.textAlign = 'center';
-  const labelCount = Math.min(weights.length, 6);
-  for (let i = 0; i < labelCount; i++) {
-    const frac = labelCount === 1 ? 0 : i / (labelCount - 1);
-    const t = tMin + frac * tSpan;
-    const x = pad.left + frac * chartW;
-    const d = new Date(t);
-    const dateStr = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
-    ctx.fillText(formatDateShort(dateStr), x, height - 8);
+  const minLabelGap = 44;
+  const labelIdx = [];
+  for (let i = 0; i < weights.length; i++) {
+    if (!labelIdx.length || xScale(i) - xScale(labelIdx[labelIdx.length - 1]) >= minLabelGap) {
+      labelIdx.push(i);
+    }
   }
+  const lastIdx = weights.length - 1;
+  if (labelIdx[labelIdx.length - 1] !== lastIdx) {
+    while (labelIdx.length && xScale(lastIdx) - xScale(labelIdx[labelIdx.length - 1]) < minLabelGap) {
+      labelIdx.pop();
+    }
+    labelIdx.push(lastIdx);
+  }
+  labelIdx.forEach(i => {
+    ctx.fillText(formatDateShort(weights[i].date), xScale(i), height - 8);
+  });
 
   // Area fill
   const gradient = ctx.createLinearGradient(0, pad.top, 0, pad.top + chartH);

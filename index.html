@@ -2263,16 +2263,17 @@ function drawChart() {
     return;
   }
 
-  if (currentRange === 30) {
+  if (currentRange === 30 || currentRange === 90) {
     const spanDays = (new Date(weights[weights.length - 1].date + 'T00:00:00') - new Date(weights[0].date + 'T00:00:00')) / 86400000;
-    if (spanDays < 30) {
-      const daysLeft = Math.ceil(30 - spanDays);
+    if (spanDays < currentRange) {
+      const daysLeft = Math.ceil(currentRange - spanDays);
+      const fallback = currentRange === 90 && spanDays >= 30 ? '30d' : '7d';
       ctx.fillStyle = '#8b8d98';
       ctx.font = '14px -apple-system, sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText('Needs a full month of entries', width / 2, height / 2 - 10);
+      ctx.fillText(currentRange === 30 ? 'Needs a full month of entries' : 'Needs three full months of entries', width / 2, height / 2 - 10);
       ctx.font = '12px -apple-system, sans-serif';
-      ctx.fillText(`${daysLeft} more day${daysLeft === 1 ? '' : 's'} to go — try the 7d view`, width / 2, height / 2 + 12);
+      ctx.fillText(`${daysLeft} more day${daysLeft === 1 ? '' : 's'} to go — try the ${fallback} view`, width / 2, height / 2 + 12);
       return;
     }
   }

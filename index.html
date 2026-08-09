@@ -1538,6 +1538,13 @@ nav {
                 <option value="0.22" selected>0.22μm — Recommended (sterilization)</option>
                 <option value="0.45">0.45μm — Larger particles only</option>
               </select>
+              <label style="font-size:12px;color:var(--text-muted);display:block;margin-top:12px;">Recovery Method</label>
+              <div class="calc-preset-grid" id="calc-filter-recovery" style="grid-template-columns: repeat(3, 1fr);">
+                <button class="calc-preset selected" data-val="1"><div>None</div><div style="font-size:10px;color:var(--text-muted);">Full loss</div></button>
+                <button class="calc-preset" data-val="0.3"><div>Air purge</div><div style="font-size:10px;color:var(--text-muted);">~70% back</div></button>
+                <button class="calc-preset" data-val="0.15"><div>Air + chase</div><div style="font-size:10px;color:var(--text-muted);">~85% back</div></button>
+              </div>
+              <p style="font-size:11px;color:var(--text-muted);margin:4px 0 0;" id="calc-recovery-tip">Push air through the filter after the solution to recover most of the holdup.</p>
               <div style="margin-top:12px;padding:10px 12px;background:var(--bg);border-radius:8px;border:1px solid var(--border);">
                 <div style="font-size:12px;color:var(--text-muted);margin-bottom:4px;">Estimated Filter Loss</div>
                 <div style="display:flex;align-items:baseline;gap:4px;">
@@ -1545,6 +1552,7 @@ nav {
                   <span style="font-size:14px;color:var(--text-muted);">ml</span>
                 </div>
                 <div style="font-size:11px;color:var(--text-muted);margin-top:2px;" id="calc-filter-loss-units">= 28 units on a 100-unit (1mL) syringe</div>
+                <div style="font-size:11px;color:var(--green);margin-top:4px;display:none;" id="calc-filter-recovered"></div>
               </div>
               <div style="margin-top:12px;">
                 <label style="font-size:12px;color:var(--text-muted);">How to Handle Loss</label>
@@ -2932,7 +2940,7 @@ document.querySelectorAll('.levels-range').forEach(btn => {
 });
 
 // Reconstitution Calculator
-const calcState = { peptideAmt: 10, bacWater: 1, syringeUnits: 100, dose: 2, filterLoss: 0, filterMethod: 'reduce', useFilter: false, penCapacity: 3, maxInjection: 60, cartridgeCount: 1 };
+const calcState = { peptideAmt: 10, bacWater: 1, syringeUnits: 100, dose: 2, filterLoss: 0, filterBaseLoss: 0.28, filterRecovery: 1, filterMethod: 'reduce', useFilter: false, penCapacity: 3, maxInjection: 60, cartridgeCount: 1 };
 
 function setupCalcPresets(containerId, stateKey) {
   const container = document.getElementById(containerId);
@@ -2953,15 +2961,18 @@ setupCalcPresets('calc-bac-water', 'bacWater');
 setupCalcPresets('calc-syringe', 'syringeUnits');
 setupCalcPresets('calc-dose', 'dose');
 
+function applyFilterLoss() {
+  calcState.filterLoss = calcState.useFilter
+    ? calcState.filterBaseLoss * calcState.filterRecovery
+    : 0;
+}
+
 document.getElementById('calc-filter-toggle').addEventListener('change', e => {
   calcState.useFilter = e.target.checked;
   document.getElementById('filter-options').style.display = e.target.checked ? '' : 'none';
-  if (e.target.checked) {
-    const selectedDiam = document.querySelector('#calc-filter-diameter .calc-preset.selected');
-    calcState.filterLoss = parseFloat(selectedDiam.dataset.loss);
-  } else {
-    calcState.filterLoss = 0;
-  }
+  const selectedDiam = document.querySelector('#calc-filter-diameter .calc-preset.selected');
+  calcState.filterBaseLoss = parseFloat(selectedDiam.dataset.loss);
+  applyFilterLoss();
   updateCalc();
 });
 
@@ -2969,7 +2980,25 @@ document.getElementById('calc-filter-diameter').querySelectorAll('.calc-preset')
   btn.addEventListener('click', () => {
     document.getElementById('calc-filter-diameter').querySelectorAll('.calc-preset').forEach(b => b.classList.remove('selected'));
     btn.classList.add('selected');
-    calcState.filterLoss = parseFloat(btn.dataset.loss);
+    calcState.filterBaseLoss = parseFloat(btn.dataset.loss);
+    applyFilterLoss();
+    updateCalc();
+  });
+});
+
+const RECOVERY_TIPS = {
+  '1': 'Solution only — the holdup volume stays in the membrane and hub.',
+  '0.3': 'Draw 2-3 mL of air and push it through after the solution to displace the holdup.',
+  '0.15': 'Reconstitute slightly short, filter, then push your remaining BAC water through the same filter, followed by air.',
+};
+
+document.getElementById('calc-filter-recovery').querySelectorAll('.calc-preset').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.getElementById('calc-filter-recovery').querySelectorAll('.calc-preset').forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
+    calcState.filterRecovery = parseFloat(btn.dataset.val);
+    document.getElementById('calc-recovery-tip').textContent = RECOVERY_TIPS[btn.dataset.val];
+    applyFilterLoss();
     updateCalc();
   });
 });
@@ -2989,6 +3018,17 @@ function updateFilterDisplay() {
   document.getElementById('calc-filter-loss-display').textContent = loss.toFixed(2);
   const lossUnits = Math.round(loss * 100);
   document.getElementById('calc-filter-loss-units').textContent = `= ${lossUnits} units on a 100-unit (1mL) syringe`;
+
+  const recovered = document.getElementById('calc-filter-recovered');
+  const saved = calcState.filterBaseLoss - loss;
+  if (calcState.useFilter && saved > 0.001) {
+    const savedMg = calcState.bacWater > 0 ? (saved / calcState.bacWater) * calcState.peptideAmt : 0;
+    recovered.textContent = `Recovering ${saved.toFixed(2)} ml (~${savedMg.toFixed(2)} mg) vs no purge`;
+    recovered.style.display = '';
+  } else {
+    recovered.style.display = 'none';
+  }
+
   const usable = Math.max(0, calcState.bacWater - loss);
   document.getElementById('filter-usable-vol').textContent = usable.toFixed(2) + ' ml';
   document.getElementById('filter-losing-text').textContent = `(losing ${loss.toFixed(2)}ml in filter)`;

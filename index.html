@@ -1793,8 +1793,8 @@ nav {
           <h2>Injection Settings</h2>
           <div class="form-group">
             <label>Priming Dose (units)</label>
-            <input type="number" id="cart-prime-units" step="0.5" min="0" value="2">
-            <p style="font-size:11px;color:var(--text-muted);margin-top:4px;">Wasted priming the needle before each injection. 2u = 0.02 ml.</p>
+            <input type="number" id="cart-prime-units" step="0.5" min="0" value="1">
+            <p style="font-size:11px;color:var(--text-muted);margin-top:4px;">Wasted priming the needle before each injection. 1u = 0.01 ml.</p>
           </div>
           <div class="form-group">
             <label>Dose (mg)</label>
@@ -3379,9 +3379,9 @@ function saveCartridges(list) {
 
 function getCartSettings() {
   try {
-    return Object.assign({ primeUnits: 2, doseMg: 2 },
+    return Object.assign({ primeUnits: 1, doseMg: 2 },
       JSON.parse(localStorage.getItem('pt_cartset_' + getActiveProfileId())) || {});
-  } catch { return { primeUnits: 2, doseMg: 2 }; }
+  } catch { return { primeUnits: 1, doseMg: 2 }; }
 }
 
 function saveCartSettings(s) {

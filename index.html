@@ -170,6 +170,84 @@ nav {
   overflow: hidden;
 }
 
+/* At-scale cartridge visual: real 3ml pen cartridges are ~64mm x 9.5mm */
+.cart-scale-wrap {
+  overflow-x: auto;
+  padding: 4px 0 2px;
+}
+
+.cart-svg {
+  display: block;
+  height: auto;
+  max-width: 100%;
+}
+
+.cart-scale-note {
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.cart-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  margin-top: 16px;
+}
+
+.cart-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.cart-card-title {
+  font-weight: 600;
+  font-size: 15px;
+}
+
+.cart-del {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 4px 6px;
+}
+
+.cart-del:hover { color: var(--red); }
+
+.cart-slider {
+  width: 100%;
+  margin: 10px 0 4px;
+  accent-color: var(--accent);
+}
+
+.cart-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  text-align: center;
+  margin: 10px 0;
+}
+
+.cart-stat-val { font-weight: 700; color: var(--accent); }
+.cart-stat-lbl { font-size: 10px; color: var(--text-muted); text-transform: uppercase; }
+
+.cart-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.cart-actions button { flex: 1; min-width: 90px; padding: 9px; font-size: 13px; }
+
+.cart-empty {
+  text-align: center;
+  color: var(--text-muted);
+  padding: 32px 16px;
+  font-size: 14px;
+}
+
 .progress-bar {
   height: 100%;
   background: linear-gradient(90deg, var(--accent), var(--green));
@@ -1223,6 +1301,7 @@ nav {
         <button class="nav-btn" data-view="doses">Doses</button>
         <button class="nav-btn" data-view="levels">Levels</button>
         <button class="nav-btn" data-view="calc">Calc</button>
+        <button class="nav-btn" data-view="cartridges">Cartridges</button>
         <button class="nav-btn" data-view="protocol">Protocol</button>
       </nav>
     </header>
@@ -1683,35 +1762,47 @@ nav {
         </div>
       </section>
 
+      <!-- Cartridges View -->
+      <section id="view-cartridges" class="view">
+        <div class="form-card">
+          <h2>Add Cartridge</h2>
+          <div class="form-group">
+            <label>Label</label>
+            <input type="text" id="cart-new-label" placeholder="e.g. Cartridge A">
+          </div>
+          <div class="form-group">
+            <label>Capacity (ml)</label>
+            <div class="calc-preset-grid" id="cart-new-capacity" style="grid-template-columns: repeat(3, 1fr);">
+              <button class="calc-preset" data-val="1.5">1.5 ml</button>
+              <button class="calc-preset selected" data-val="3">3.0 ml</button>
+              <button class="calc-preset" data-val="5">5.0 ml</button>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Filled Volume (ml)</label>
+            <input type="number" id="cart-new-volume" step="0.05" min="0.05" placeholder="e.g. 3">
+          </div>
+          <div class="form-group">
+            <label>Concentration (mg/ml)</label>
+            <input type="number" id="cart-new-conc" step="0.1" min="0.1" placeholder="e.g. 10">
+          </div>
+          <button class="btn-primary" id="cart-add-btn" style="width:100%;">Add Cartridge</button>
+        </div>
+
         <div class="form-card" style="margin-top:16px;">
-          <h2>Pen / Vial Tracker</h2>
-          <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px;">Track how much is left in your current pen or vial.</p>
+          <h2>Injection Settings</h2>
           <div class="form-group">
-            <label>Total Amount (mg)</label>
-            <input type="number" id="pen-total" step="0.1" min="1" placeholder="e.g. 10" value="">
+            <label>Priming Dose (units)</label>
+            <input type="number" id="cart-prime-units" step="0.5" min="0" value="2">
+            <p style="font-size:11px;color:var(--text-muted);margin-top:4px;">Wasted priming the needle before each injection. 2u = 0.02 ml.</p>
           </div>
           <div class="form-group">
-            <label>Remaining (mg)</label>
-            <input type="number" id="pen-remaining" step="0.1" min="0" placeholder="e.g. 8" value="">
-          </div>
-          <div style="display:flex;gap:8px;">
-            <button class="btn-primary" id="pen-save-btn" style="flex:1;">Save</button>
-            <button class="btn-secondary" id="pen-use-dose-btn" style="flex:1;">Use Dose</button>
-          </div>
-          <div id="pen-status" style="margin-top:12px;display:none;">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-              <span style="font-size:14px;font-weight:600;">Pen Status</span>
-              <span style="font-size:13px;color:var(--text-muted);" id="pen-status-label"></span>
-            </div>
-            <div class="progress-bar-container">
-              <div class="progress-bar" id="pen-progress-bar" style="background:var(--green);"></div>
-            </div>
-            <div style="display:flex;justify-content:space-between;margin-top:6px;font-size:12px;color:var(--text-muted);">
-              <span id="pen-doses-left"></span>
-              <span id="pen-mg-left"></span>
-            </div>
+            <label>Dose (mg)</label>
+            <input type="number" id="cart-dose-mg" step="0.1" min="0.1" value="2">
           </div>
         </div>
+
+        <div id="cart-list"></div>
       </section>
 
       <!-- Protocol View -->
@@ -3139,8 +3230,6 @@ function updateCalc() {
   document.getElementById('calc-conc').parentElement.style.display = '';
   document.getElementById('calc-vol').parentElement.style.display = '';
 
-  renderPenStatus();
-
   const syringeViz = document.querySelector('.calc-syringe');
   if (isPen) {
     syringeViz.style.display = 'none';
@@ -3245,7 +3334,7 @@ function updateCartridgePlan() {
         <div><div style="font-weight:700;color:var(--accent);">${thisMg.toFixed(1)}</div><div style="font-size:10px;color:var(--text-muted);">MG</div></div>
         <div><div style="font-weight:700;color:var(--accent);">${thisDoses}</div><div style="font-size:10px;color:var(--text-muted);">DOSES</div></div>
       </div>
-      <button class="btn-primary cart-load-btn" data-mg="${thisMg.toFixed(2)}" style="width:100%;padding:8px;font-size:12px;">Load into Pen Tracker</button>
+      <button class="btn-primary cart-load-btn" data-ml="${thisVol.toFixed(3)}" data-conc="${concentration.toFixed(3)}" data-cap="${penCapacity}" style="width:100%;padding:8px;font-size:12px;">Send to Cartridges</button>
     </div>`;
   }
   document.getElementById('cart-details').innerHTML = detailsHtml;
@@ -3256,15 +3345,20 @@ function updateCartridgePlan() {
 
   document.querySelectorAll('.cart-load-btn').forEach(btn => {
     btn.addEventListener('click', () => {
-      const mg = parseFloat(btn.dataset.mg);
-      savePenData({ total: mg, remaining: mg });
-      document.getElementById('pen-total').value = mg;
-      document.getElementById('pen-remaining').value = mg;
-      renderPenStatus();
-      btn.textContent = 'Loaded!';
+      const carts = getCartridges();
+      carts.push({
+        id: String(Date.now()) + carts.length,
+        label: `Cartridge ${String.fromCharCode(65 + carts.length)}`,
+        capacity: parseFloat(btn.dataset.cap),
+        remaining: parseFloat(btn.dataset.ml),
+        conc: parseFloat(btn.dataset.conc),
+      });
+      saveCartridges(carts);
+      renderCartridges();
+      btn.textContent = 'Sent!';
       btn.style.background = 'var(--green)';
-      setTimeout(() => { btn.textContent = 'Load into Pen Tracker'; btn.style.background = ''; }, 1500);
-      document.getElementById('pen-status').scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setTimeout(() => { btn.textContent = 'Send to Cartridges'; btn.style.background = ''; }, 1500);
+      showToast('Added to Cartridges tab');
     });
   });
 }
@@ -3272,55 +3366,205 @@ function updateCartridgePlan() {
 updateCalc();
 updateCartridgePlan();
 
-// Pen/Vial tracker
-function getPenData() {
-  try { return JSON.parse(localStorage.getItem('pt_pen_' + getActiveProfileId())) || null; } catch { return null; }
+// Cartridges
+const UNITS_PER_ML = 100;
+
+function getCartridges() {
+  try { return JSON.parse(localStorage.getItem('pt_cartridges_' + getActiveProfileId())) || []; } catch { return []; }
 }
 
-function savePenData(data) {
-  localStorage.setItem('pt_pen_' + getActiveProfileId(), JSON.stringify(data));
+function saveCartridges(list) {
+  localStorage.setItem('pt_cartridges_' + getActiveProfileId(), JSON.stringify(list));
 }
 
-function renderPenStatus() {
-  const pen = getPenData();
-  const statusEl = document.getElementById('pen-status');
-  if (!pen) { statusEl.style.display = 'none'; return; }
-
-  statusEl.style.display = '';
-  document.getElementById('pen-total').value = pen.total;
-  document.getElementById('pen-remaining').value = pen.remaining;
-
-  const pct = (pen.remaining / pen.total) * 100;
-  document.getElementById('pen-progress-bar').style.width = pct + '%';
-  document.getElementById('pen-progress-bar').style.background = pct < 20 ? 'var(--red)' : pct < 40 ? 'var(--orange)' : 'var(--green)';
-  document.getElementById('pen-status-label').textContent = pct.toFixed(0) + '% remaining';
-  document.getElementById('pen-mg-left').textContent = pen.remaining.toFixed(1) + ' mg left';
-
-  const dosesLeft = Math.floor(pen.remaining / calcState.dose);
-  document.getElementById('pen-doses-left').textContent = dosesLeft + ' dose' + (dosesLeft !== 1 ? 's' : '') + ' left at ' + calcState.dose + 'mg';
+function getCartSettings() {
+  try {
+    return Object.assign({ primeUnits: 2, doseMg: 2 },
+      JSON.parse(localStorage.getItem('pt_cartset_' + getActiveProfileId())) || {});
+  } catch { return { primeUnits: 2, doseMg: 2 }; }
 }
 
-document.getElementById('pen-save-btn').addEventListener('click', () => {
-  const total = parseFloat(document.getElementById('pen-total').value);
-  const remaining = parseFloat(document.getElementById('pen-remaining').value);
-  if (isNaN(total) || isNaN(remaining) || total <= 0) { showToast('Enter total and remaining', 'error'); return; }
-  savePenData({ total, remaining });
-  renderPenStatus();
-  showToast('Pen saved');
+function saveCartSettings(s) {
+  localStorage.setItem('pt_cartset_' + getActiveProfileId(), JSON.stringify(s));
+}
+
+// Draws a to-scale cartridge. Real 3ml pen cartridges are ~64mm long,
+// so the SVG uses 1 unit = 1mm and CSS sizes it in physical mm.
+function cartridgeSvg(cart) {
+  const lenMm = cart.capacity <= 1.5 ? 44 : cart.capacity <= 3 ? 64 : 80;
+  const bodyStart = 2, crimpStart = lenMm - 10;
+  const usable = crimpStart - bodyStart - 4;
+  const frac = cart.capacity > 0 ? Math.max(0, Math.min(1, cart.remaining / cart.capacity)) : 0;
+  const liqLen = usable * frac;
+  const liqStart = crimpStart - liqLen;
+  const plungerW = 4;
+  const plungerX = Math.max(bodyStart, liqStart - plungerW);
+
+  let ticks = '';
+  const step = cart.capacity <= 1.5 ? 0.5 : cart.capacity <= 3 ? 0.5 : 1;
+  for (let v = step; v < cart.capacity; v += step) {
+    const x = crimpStart - usable * (v / cart.capacity);
+    ticks += `<line x1="${x}" y1="1.6" x2="${x}" y2="3.2" stroke="#4a4d5e" stroke-width="0.3"/>`;
+  }
+
+  return `<svg class="cart-svg" viewBox="0 0 ${lenMm} 10" width="${lenMm}mm" preserveAspectRatio="xMinYMid meet" role="img" aria-label="${cart.capacity}ml cartridge, ${cart.remaining.toFixed(2)}ml remaining">
+    <rect x="${bodyStart}" y="1.2" width="${crimpStart - bodyStart}" height="7.6" rx="0.8" fill="#1a1d29" stroke="#4a4d5e" stroke-width="0.35"/>
+    <rect x="${liqStart}" y="1.5" width="${liqLen}" height="7" fill="url(#liqGrad)"/>
+    ${ticks}
+    <rect x="${plungerX}" y="1.4" width="${plungerW}" height="7.2" rx="0.6" fill="#6b6f80" stroke="#3a3d4a" stroke-width="0.25"/>
+    <line x1="${plungerX + 1.3}" y1="1.4" x2="${plungerX + 1.3}" y2="8.6" stroke="#54586620" stroke-width="0.4"/>
+    <rect x="${crimpStart}" y="2.2" width="5" height="5.6" fill="#8b8f9e" stroke="#5a5e6c" stroke-width="0.25"/>
+    <rect x="${crimpStart + 5}" y="3.4" width="2.4" height="3.2" fill="#3a3d4a"/>
+    <rect x="${crimpStart + 7.4}" y="4.3" width="2.4" height="1.4" rx="0.3" fill="#6b6f80"/>
+    <defs>
+      <linearGradient id="liqGrad" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#8b7cf0"/>
+        <stop offset="100%" stop-color="#6c5ce7"/>
+      </linearGradient>
+    </defs>
+  </svg>`;
+}
+
+function renderCartridges() {
+  const listEl = document.getElementById('cart-list');
+  if (!listEl) return;
+  const carts = getCartridges();
+  const set = getCartSettings();
+  const primeMl = set.primeUnits / UNITS_PER_ML;
+
+  if (!carts.length) {
+    listEl.innerHTML = '<div class="cart-empty">No cartridges yet. Add one above, or send one over from the Calc tab.</div>';
+    return;
+  }
+
+  listEl.innerHTML = carts.map(c => {
+    const mgLeft = c.remaining * c.conc;
+    const doseMl = set.doseMg / c.conc;
+    const perShot = doseMl + primeMl;
+    const shotsLeft = perShot > 0 ? Math.floor(c.remaining / perShot) : 0;
+    const pct = c.capacity > 0 ? (c.remaining / c.capacity) * 100 : 0;
+    return `<div class="cart-card" data-id="${c.id}">
+      <div class="cart-card-head">
+        <span class="cart-card-title">${c.label}</span>
+        <button class="cart-del" data-act="del" title="Delete">&times;</button>
+      </div>
+      <div class="cart-scale-wrap">${cartridgeSvg(c)}</div>
+      <div class="cart-scale-note">Shown at actual size &middot; ${c.capacity} ml cartridge &middot; ${pct.toFixed(0)}% full</div>
+      <input type="range" class="cart-slider" data-act="slider" min="0" max="${c.capacity}" step="0.01" value="${c.remaining}">
+      <div class="cart-stats">
+        <div><div class="cart-stat-val">${c.remaining.toFixed(2)}</div><div class="cart-stat-lbl">ML Left</div></div>
+        <div><div class="cart-stat-val">${mgLeft.toFixed(1)}</div><div class="cart-stat-lbl">MG Left</div></div>
+        <div><div class="cart-stat-val">${shotsLeft}</div><div class="cart-stat-lbl">Shots Left</div></div>
+      </div>
+      <div class="cart-actions">
+        <button class="btn-primary" data-act="inject">Inject ${set.doseMg}mg</button>
+        <button class="btn-secondary" data-act="prime">Prime ${set.primeUnits}u</button>
+        <button class="btn-secondary" data-act="refill">Refill</button>
+      </div>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:8px;">
+        ${c.conc} mg/ml &middot; dose ${(doseMl * UNITS_PER_ML).toFixed(0)}u + ${set.primeUnits}u prime = ${(perShot * UNITS_PER_ML).toFixed(0)}u per shot
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function updateCartridge(id, fn) {
+  const carts = getCartridges();
+  const c = carts.find(x => x.id === id);
+  if (!c) return;
+  fn(c);
+  c.remaining = Math.max(0, Math.min(c.capacity, parseFloat(c.remaining.toFixed(3))));
+  saveCartridges(carts);
+  renderCartridges();
+}
+
+document.getElementById('cart-list').addEventListener('click', e => {
+  const btn = e.target.closest('[data-act]');
+  if (!btn || btn.dataset.act === 'slider') return;
+  const id = btn.closest('.cart-card').dataset.id;
+  const set = getCartSettings();
+  const act = btn.dataset.act;
+
+  if (act === 'del') {
+    saveCartridges(getCartridges().filter(c => c.id !== id));
+    renderCartridges();
+    showToast('Cartridge removed');
+    return;
+  }
+  if (act === 'refill') {
+    updateCartridge(id, c => { c.remaining = c.capacity; });
+    showToast('Refilled to full');
+    return;
+  }
+
+  const carts = getCartridges();
+  const c = carts.find(x => x.id === id);
+  if (!c) return;
+  const primeMl = set.primeUnits / UNITS_PER_ML;
+  const need = act === 'inject' ? set.doseMg / c.conc + primeMl : primeMl;
+
+  if (c.remaining < need - 1e-9) {
+    showToast('Not enough left in this cartridge', 'error');
+    return;
+  }
+  updateCartridge(id, x => { x.remaining -= need; });
+  showToast(act === 'inject'
+    ? `Injected ${set.doseMg}mg (+${set.primeUnits}u prime)`
+    : `Primed ${set.primeUnits}u`);
 });
 
-document.getElementById('pen-use-dose-btn').addEventListener('click', () => {
-  const pen = getPenData();
-  if (!pen) { showToast('Save pen data first', 'error'); return; }
-  const newRemaining = pen.remaining - calcState.dose;
-  if (newRemaining < 0) { showToast('Not enough left for this dose', 'error'); return; }
-  pen.remaining = parseFloat(newRemaining.toFixed(1));
-  savePenData(pen);
-  renderPenStatus();
-  showToast(`Used ${calcState.dose}mg — ${pen.remaining}mg left`);
+document.getElementById('cart-list').addEventListener('input', e => {
+  const slider = e.target.closest('[data-act="slider"]');
+  if (!slider) return;
+  updateCartridge(slider.closest('.cart-card').dataset.id, c => { c.remaining = parseFloat(slider.value); });
 });
 
-renderPenStatus();
+setupCalcPresets('cart-new-capacity', 'newCartCapacity');
+
+document.getElementById('cart-add-btn').addEventListener('click', () => {
+  const capBtn = document.querySelector('#cart-new-capacity .calc-preset.selected');
+  const capacity = parseFloat(capBtn.dataset.val);
+  const volInput = document.getElementById('cart-new-volume').value;
+  const volume = volInput === '' ? capacity : parseFloat(volInput);
+  const conc = parseFloat(document.getElementById('cart-new-conc').value);
+  const label = document.getElementById('cart-new-label').value.trim();
+
+  if (isNaN(conc) || conc <= 0) { showToast('Enter a concentration', 'error'); return; }
+  if (isNaN(volume) || volume <= 0) { showToast('Enter a fill volume', 'error'); return; }
+  if (volume > capacity) { showToast('Fill volume exceeds capacity', 'error'); return; }
+
+  const carts = getCartridges();
+  carts.push({
+    id: String(Date.now()),
+    label: label || `Cartridge ${String.fromCharCode(65 + carts.length)}`,
+    capacity, remaining: volume, conc,
+  });
+  saveCartridges(carts);
+  document.getElementById('cart-new-label').value = '';
+  document.getElementById('cart-new-volume').value = '';
+  renderCartridges();
+  showToast('Cartridge added');
+});
+
+['cart-prime-units', 'cart-dose-mg'].forEach(id => {
+  document.getElementById(id).addEventListener('input', () => {
+    const set = getCartSettings();
+    const v = parseFloat(document.getElementById(id).value);
+    if (isNaN(v) || v < 0) return;
+    if (id === 'cart-prime-units') set.primeUnits = v; else set.doseMg = v;
+    saveCartSettings(set);
+    renderCartridges();
+  });
+});
+
+function loadCartSettingsForm() {
+  const set = getCartSettings();
+  document.getElementById('cart-prime-units').value = set.primeUnits;
+  document.getElementById('cart-dose-mg').value = set.doseMg;
+}
+
+loadCartSettingsForm();
+renderCartridges();
 
 // Export / Import
 document.getElementById('export-btn').addEventListener('click', () => {
@@ -3377,7 +3621,8 @@ function initApp() {
   renderDoseHistory();
   renderLevels();
   renderProtocol();
-  renderPenStatus();
+  loadCartSettingsForm();
+  renderCartridges();
 }
 if (getActiveProfileId()) initApp();
   </script>

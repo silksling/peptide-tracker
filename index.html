@@ -1393,6 +1393,7 @@ nav {
             <button class="chart-range" data-range="all">All</button>
           </div>
           <canvas id="weight-chart"></canvas>
+          <p style="font-size:11px;color:var(--text-muted);margin-top:6px;text-align:center;">Each segment is colored and labeled by the dose in effect over that interval</p>
         </div>
         <div class="chart-container">
           <h2>Dose Levels</h2>
@@ -2450,42 +2451,102 @@ function drawChart() {
     ctx.fillText(formatDateShort(weights[i].date), xScale(i), height - 8);
   });
 
-  // Area fill
-  const gradient = ctx.createLinearGradient(0, pad.top, 0, pad.top + chartH);
-  gradient.addColorStop(0, 'rgba(108, 92, 231, 0.3)');
-  gradient.addColorStop(1, 'rgba(108, 92, 231, 0.0)');
-  ctx.beginPath();
-  ctx.moveTo(xScale(0), yScale(values[0]));
-  for (let i = 1; i < values.length; i++) {
-    ctx.lineTo(xScale(i), yScale(values[i]));
-  }
-  ctx.lineTo(xScale(values.length - 1), pad.top + chartH);
-  ctx.lineTo(xScale(0), pad.top + chartH);
-  ctx.closePath();
-  ctx.fillStyle = gradient;
-  ctx.fill();
+  // Each consecutive pair is its own segment, colored by the dose in effect
+  // at that point so the slope of each interval reads against its dose.
+  const allDoses = getDoses().slice().sort((a, b) => doseTimestamp(a) - doseTimestamp(b));
+  const doseAt = t => {
+    let found = null;
+    for (const d of allDoses) {
+      if (doseTimestamp(d) <= t) found = d; else break;
+    }
+    return found ? found.amount : null;
+  };
 
-  // Line
-  ctx.beginPath();
-  ctx.moveTo(xScale(0), yScale(values[0]));
+  // Rank unique doses low->high so the ramp reads gray -> purple -> teal
+  const DOSE_RAMP = ['#8b8d98', '#a99cf0', '#8b7cf0', '#6c5ce7', '#5b4bd6', '#00b894', '#0ea5a5'];
+  const uniqueDoses = [...new Set(weights.map(w => doseAt(new Date(w.date + 'T23:59:59').getTime())).filter(v => v != null))].sort((a, b) => a - b);
+  const doseColor = amt => {
+    if (amt == null) return '#8b8d98';
+    const rank = uniqueDoses.indexOf(amt);
+    if (uniqueDoses.length === 1) return DOSE_RAMP[3];
+    const pos = Math.round((rank / (uniqueDoses.length - 1)) * (DOSE_RAMP.length - 1));
+    return DOSE_RAMP[pos];
+  };
+
+  const segments = [];
   for (let i = 1; i < values.length; i++) {
-    ctx.lineTo(xScale(i), yScale(values[i]));
+    const amt = doseAt(new Date(weights[i].date + 'T23:59:59').getTime());
+    segments.push({ i, amt, color: doseColor(amt) });
   }
-  ctx.strokeStyle = '#6c5ce7';
-  ctx.lineWidth = 2.5;
+
+  ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
-  ctx.stroke();
+  segments.forEach(seg => {
+    ctx.beginPath();
+    ctx.moveTo(xScale(seg.i - 1), yScale(values[seg.i - 1]));
+    ctx.lineTo(xScale(seg.i), yScale(values[seg.i]));
+    ctx.strokeStyle = seg.color;
+    ctx.lineWidth = 3;
+    ctx.stroke();
+  });
+  ctx.lineCap = 'butt';
 
   // Dots
   for (let i = 0; i < values.length; i++) {
+    const amt = doseAt(new Date(weights[i].date + 'T23:59:59').getTime());
     ctx.beginPath();
     ctx.arc(xScale(i), yScale(values[i]), 3.5, 0, Math.PI * 2);
-    ctx.fillStyle = '#6c5ce7';
+    ctx.fillStyle = '#0f1117';
     ctx.fill();
-    ctx.strokeStyle = '#0f1117';
-    ctx.lineWidth = 2;
+    ctx.strokeStyle = doseColor(amt);
+    ctx.lineWidth = 2.5;
     ctx.stroke();
   }
+
+  // Dose pills, placed above each segment and nudged up to avoid collisions
+  ctx.font = '600 11px -apple-system, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  const placed = [];
+  const pillH = 17;
+
+  segments.forEach(seg => {
+    if (seg.amt == null) return;
+    const text = `${seg.amt}mg`;
+    const w = ctx.measureText(text).width + 14;
+    const x0 = xScale(seg.i - 1), x1 = xScale(seg.i);
+    let cx = (x0 + x1) / 2;
+    cx = Math.max(pad.left + w / 2, Math.min(width - pad.right - w / 2, cx));
+
+    const segTopY = Math.min(yScale(values[seg.i - 1]), yScale(values[seg.i]));
+    let cy = segTopY - 14;
+
+    // Walk upward until this pill clears the ones already placed
+    for (let guard = 0; guard < 40; guard++) {
+      const clash = placed.some(p =>
+        Math.abs(p.cx - cx) < (p.w + w) / 2 + 3 && Math.abs(p.cy - cy) < pillH + 2);
+      if (!clash) break;
+      cy -= pillH + 3;
+    }
+    if (cy < pad.top - 6) return;
+    placed.push({ cx, cy, w });
+
+    const r = pillH / 2;
+    const left = cx - w / 2, right = cx + w / 2;
+    ctx.beginPath();
+    ctx.moveTo(left + r, cy - r);
+    ctx.lineTo(right - r, cy - r);
+    ctx.arc(right - r, cy, r, -Math.PI / 2, Math.PI / 2);
+    ctx.lineTo(left + r, cy + r);
+    ctx.arc(left + r, cy, r, Math.PI / 2, -Math.PI / 2);
+    ctx.closePath();
+    ctx.fillStyle = seg.color;
+    ctx.fill();
+
+    ctx.fillStyle = '#fff';
+    ctx.fillText(text, cx, cy + 0.5);
+  });
+  ctx.textBaseline = 'alphabetic';
 
   // Goal line
   const proto = getProtocol();

@@ -33,16 +33,27 @@
   --radius-sm: 8px;
 }
 
+/* The page itself must never pan sideways. Wide content scrolls inside its
+   own container, and overscroll-behavior-x stops those containers from
+   chaining their scroll out to the page on iOS. */
+html {
+  overflow-x: hidden;
+  width: 100%;
+  overscroll-behavior-x: none;
+  touch-action: pan-y;
+}
+
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
   background: var(--bg);
   color: var(--text);
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
-  /* Keep the page itself from panning sideways; wide content scrolls
-     inside its own container instead. */
   overflow-x: hidden;
   width: 100%;
+  max-width: 100%;
+  position: relative;
+  overscroll-behavior-x: none;
 }
 
 #app {
@@ -50,6 +61,7 @@ body {
   margin: 0 auto;
   padding: env(safe-area-inset-top, 0) 16px calc(80px + env(safe-area-inset-bottom, 0));
   overflow-x: hidden;
+  width: 100%;
 }
 
 header {
@@ -63,24 +75,37 @@ header h1 {
   letter-spacing: -0.5px;
 }
 
+/* The tab strip is the only thing allowed to scroll sideways.
+   overscroll-behavior-x: contain keeps that drag from reaching the page. */
 nav {
   display: flex;
+  flex-wrap: nowrap;
   gap: 4px;
   background: var(--bg-card);
   border-radius: var(--radius);
   padding: 4px;
+  width: 100%;
   max-width: 100%;
+  min-width: 0;
   overflow-x: auto;
+  overflow-y: hidden;
   -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+  touch-action: pan-x;
   scrollbar-width: none;
+  -ms-overflow-style: none;
 }
 
-nav::-webkit-scrollbar { display: none; }
+nav::-webkit-scrollbar { display: none; width: 0; height: 0; }
+
+@media (max-width: 430px) {
+  .nav-btn { padding: 10px 9px; font-size: 11.5px; }
+}
 
 .nav-btn {
-  flex: 1 0 auto;
+  flex: 0 0 auto;
   white-space: nowrap;
-  padding: 10px 8px;
+  padding: 10px 12px;
   border: none;
   background: transparent;
   color: var(--text-muted);
@@ -88,7 +113,7 @@ nav::-webkit-scrollbar { display: none; }
   font-weight: 500;
   border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background 0.2s, color 0.2s;
 }
 
 .nav-btn.active {
@@ -207,9 +232,11 @@ nav::-webkit-scrollbar { display: none; }
 
 .chart-scroll {
   width: 100%;
+  max-width: 100%;
   overflow-x: auto;
   overflow-y: hidden;
   -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
 }
 
 .chart-scroll canvas {
@@ -221,6 +248,9 @@ nav::-webkit-scrollbar { display: none; }
 /* At-scale cartridge visual: real 3ml pen cartridges are ~64mm x 9.5mm */
 .cart-scale-wrap {
   overflow-x: auto;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  max-width: 100%;
   padding: 4px 0 2px;
 }
 

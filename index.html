@@ -170,6 +170,42 @@ nav {
   overflow: hidden;
 }
 
+.proj-box {
+  margin-top: 12px;
+  padding: 14px;
+  background: var(--bg);
+  border: 1px solid var(--green);
+  border-radius: 10px;
+  text-align: center;
+}
+
+.proj-box.proj-muted {
+  border-color: var(--border);
+  color: var(--text-muted);
+  font-size: 13px;
+  padding: 12px;
+}
+
+.proj-label { font-size: 12px; color: var(--text-muted); }
+.proj-date { font-size: 19px; font-weight: 700; color: var(--green); margin-top: 2px; }
+.proj-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 10px; }
+.proj-val { font-weight: 700; font-size: 16px; }
+.proj-sub { font-size: 10px; color: var(--text-muted); }
+.proj-foot { font-size: 10px; color: var(--text-muted); margin-top: 8px; }
+
+.chart-scroll {
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+
+.chart-scroll canvas {
+  display: block;
+  height: 220px;
+  touch-action: pan-x;
+}
+
 /* At-scale cartridge visual: real 3ml pen cartridges are ~64mm x 9.5mm */
 .cart-scale-wrap {
   overflow-x: auto;
@@ -1392,8 +1428,9 @@ nav {
             <button class="chart-range" data-range="90">90d</button>
             <button class="chart-range" data-range="all">All</button>
           </div>
-          <canvas id="weight-chart"></canvas>
-          <p style="font-size:11px;color:var(--text-muted);margin-top:6px;text-align:center;">Each segment is colored and labeled by the dose in effect over that interval</p>
+          <div class="chart-scroll"><canvas id="weight-chart"></canvas></div>
+          <p style="font-size:11px;color:var(--text-muted);margin-top:6px;text-align:center;">Each segment is colored by the dose over that interval &middot; drag across to scrub</p>
+          <div id="projection-box"></div>
         </div>
         <div class="chart-container">
           <h2>Dose Levels</h2>
@@ -2338,9 +2375,73 @@ function renderProtocol() {
 
 // Chart drawing
 let currentRange = 7;
+let scrubX = null;
+let weightChartGeo = null;
+
+function visibleWeights() {
+  let ws = getWeights();
+  if (currentRange !== 'all') {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - currentRange);
+    const cs = cutoff.toISOString().split('T')[0];
+    ws = ws.filter(w => w.date >= cs);
+  }
+  return ws;
+}
+
+// Fitted rate (lb/day) and, when a goal is set and reachable, the days out.
+function weightSeriesStats(weights) {
+  const values = weights.map(w => w.value);
+  const times = weights.map(w => new Date(w.date + 'T00:00:00').getTime());
+  let slope = 0;
+  if (values.length >= 2) {
+    const mt = times.reduce((a, b) => a + b, 0) / times.length;
+    const mv = values.reduce((a, b) => a + b, 0) / values.length;
+    let num = 0, den = 0;
+    for (let i = 0; i < values.length; i++) {
+      num += (times[i] - mt) * (values[i] - mv);
+      den += (times[i] - mt) ** 2;
+    }
+    slope = den ? (num / den) * 86400000 : 0;
+  }
+  const proto = getProtocol();
+  const goal = proto && proto.goalWeight ? parseFloat(proto.goalWeight) : null;
+  const lastVal = values[values.length - 1];
+  let projDays = null;
+  if (goal != null && slope < -0.0001 && lastVal != null && goal < lastVal) {
+    const d = (goal - lastVal) / slope;
+    if (d > 0 && d < 365 * 3) projDays = d;
+  }
+  const dataDays = times.length >= 2 ? (times[times.length - 1] - times[0]) / 86400000 : 0;
+  return { slope, goal, lastVal, projDays, dataDays, times, values };
+}
+
+// Widen the canvas so dose pills keep full size; the wrapper scrolls.
+function sizeWeightCanvas() {
+  const canvas = document.getElementById('weight-chart');
+  const wrap = canvas.parentElement;
+  let n = 0;
+  try {
+    n = Math.max(0, visibleWeights().length - 1);
+  } catch { n = 0; }
+  // Measure the container, not the scroll wrapper: the wrapper's own width
+  // depends on the canvas we're about to size.
+  const host = wrap.parentElement || wrap;
+  const cs = getComputedStyle(host);
+  const avail = Math.max(240, host.clientWidth - parseFloat(cs.paddingLeft || 0) - parseFloat(cs.paddingRight || 0));
+  const needed = 64 + n * 52;
+  canvas.style.width = Math.max(avail, needed) + 'px';
+}
 
 function drawChart() {
   const canvas = document.getElementById('weight-chart');
+  sizeWeightCanvas();
+  // The projection reads the full visible series, so it stays valid even on
+  // the early-return paths below where no chart gets drawn.
+  try {
+    const vw = visibleWeights();
+    renderProjection(vw.length >= 2 ? weightSeriesStats(vw) : null);
+  } catch { renderProjection(null); }
   const ctx = canvas.getContext('2d');
   const dpr = window.devicePixelRatio || 1;
   const rect = canvas.getBoundingClientRect();
@@ -2393,7 +2494,9 @@ function drawChart() {
     return;
   }
 
-  const values = weights.map(w => w.value);
+  const stats = weightSeriesStats(weights);
+  const { values, times } = stats;
+
   const minVal = Math.min(...values);
   const maxVal = Math.max(...values);
   const range = maxVal - minVal || 10;
@@ -2403,12 +2506,12 @@ function drawChart() {
   const chartW = width - pad.left - pad.right;
   const chartH = height - pad.top - pad.bottom;
 
-  const times = weights.map(w => new Date(w.date + 'T00:00:00').getTime());
   const tMin = times[0];
   const tMax = times[times.length - 1];
   const tSpan = (tMax - tMin) || 1;
 
-  const xScale = i => pad.left + ((times[i] - tMin) / tSpan) * chartW;
+  const xForTime = t => pad.left + ((t - tMin) / tSpan) * chartW;
+  const xScale = i => xForTime(times[i]);
   const yScale = v => pad.top + chartH - ((v - yMin) / (yMax - yMin)) * chartH;
 
   // Grid lines
@@ -2566,16 +2669,139 @@ function drawChart() {
     ctx.textAlign = 'left';
     ctx.fillText(`Goal: ${proto.goalWeight}`, pad.left + 4, goalY - 6);
   }
+
+  // Scrub crosshair + readout
+  weightChartGeo = { weights, values, times, xScale, yScale, pad, chartW, chartH, width, height, doseAt, doseColor, tMin, tSpan };
+
+  if (scrubX != null) {
+    const x = Math.max(pad.left, Math.min(width - pad.right, scrubX));
+    let near = 0, best = Infinity;
+    for (let i = 0; i < times.length; i++) {
+      const d = Math.abs(xScale(i) - x);
+      if (d < best) { best = d; near = i; }
+    }
+    const nx = xScale(near), ny = yScale(values[near]);
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(nx, pad.top);
+    ctx.lineTo(nx, pad.top + chartH);
+    ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.arc(nx, ny, 6, 0, Math.PI * 2);
+    ctx.fillStyle = '#fff';
+    ctx.fill();
+
+    const amt = doseAt(new Date(weights[near].date + 'T23:59:59').getTime());
+    const l1 = `${values[near].toFixed(1)} lbs`;
+    const l2 = formatDateShort(weights[near].date) + (amt != null ? ` · ${amt}mg` : '');
+    ctx.font = '600 12px -apple-system, sans-serif';
+    const w1 = ctx.measureText(l1).width;
+    ctx.font = '11px -apple-system, sans-serif';
+    const w2 = ctx.measureText(l2).width;
+    const bw = Math.max(w1, w2) + 16, bh = 38;
+    let bx = nx - bw / 2;
+    bx = Math.max(pad.left, Math.min(width - pad.right - bw, bx));
+    const by = pad.top + 2;
+
+    ctx.beginPath();
+    ctx.roundRect ? ctx.roundRect(bx, by, bw, bh, 6) : ctx.rect(bx, by, bw, bh);
+    ctx.fillStyle = 'rgba(20,22,32,0.95)';
+    ctx.fill();
+    ctx.strokeStyle = '#3a3d4a';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#fff';
+    ctx.font = '600 12px -apple-system, sans-serif';
+    ctx.fillText(l1, bx + bw / 2, by + 16);
+    ctx.fillStyle = '#8b8d98';
+    ctx.font = '11px -apple-system, sans-serif';
+    ctx.fillText(l2, bx + bw / 2, by + 30);
+    ctx.restore();
+  }
+
 }
 
-document.querySelectorAll('.chart-range').forEach(btn => {
+// Goal projection, computed from the fitted rate and shown as a card
+function renderProjection(stats) {
+  const box = document.getElementById('projection-box');
+  if (!box) return;
+
+  const note = msg => `<div class="proj-box proj-muted">${msg}</div>`;
+  if (!stats || stats.values.length < 2) { box.innerHTML = note('Log at least two weights to project a goal date.'); return; }
+
+  const { slope, goal, lastVal, projDays } = stats;
+  const perWk = slope * 7;
+
+  if (goal == null) { box.innerHTML = note('Set a goal weight in Protocol to project a date.'); return; }
+  if (goal >= lastVal) { box.innerHTML = note(`You're already at or below your ${goal} lb goal.`); return; }
+  if (!projDays) { box.innerHTML = note('No downward trend in this range yet — try a longer range.'); return; }
+
+  const target = new Date(Date.now() + projDays * 86400000);
+  const weeks = Math.round(projDays / 7);
+  const toLose = (lastVal - goal).toFixed(1);
+  const dateStr = target.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' });
+
+  box.innerHTML = `<div class="proj-box">
+    <div class="proj-label">Projected to hit ${goal} lbs</div>
+    <div class="proj-date">${dateStr}</div>
+    <div class="proj-grid">
+      <div><div class="proj-val">${weeks}</div><div class="proj-sub">WEEKS</div></div>
+      <div><div class="proj-val">${perWk.toFixed(1)}</div><div class="proj-sub">LB/WK</div></div>
+      <div><div class="proj-val">${toLose}</div><div class="proj-sub">LBS TO GO</div></div>
+    </div>
+    <div class="proj-foot">Based on the fitted rate across the ${currentRange === 'all' ? 'full history' : currentRange + '-day range'}.</div>
+  </div>`;
+}
+
+document.querySelectorAll('.chart-range[data-range]').forEach(btn => {
   btn.addEventListener('click', () => {
-    document.querySelectorAll('.chart-range').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.chart-range[data-range]').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     currentRange = btn.dataset.range === 'all' ? 'all' : parseInt(btn.dataset.range);
+    scrubX = null;
     drawChart();
   });
 });
+
+// Drag/scrub across the weight chart to trace values
+(() => {
+  const canvas = document.getElementById('weight-chart');
+  if (!canvas) return;
+  let active = false;
+
+  const posFrom = e => {
+    const r = canvas.getBoundingClientRect();
+    const cx = e.touches ? e.touches[0].clientX : e.clientX;
+    return cx - r.left;
+  };
+  const move = e => {
+    if (!active) return;
+    scrubX = posFrom(e);
+    drawChart();
+    if (e.cancelable) e.preventDefault();
+  };
+  const end = () => {
+    if (!active) return;
+    active = false;
+    scrubX = null;
+    drawChart();
+  };
+
+  canvas.addEventListener('mousedown', e => { active = true; scrubX = posFrom(e); drawChart(); });
+  window.addEventListener('mousemove', move);
+  window.addEventListener('mouseup', end);
+
+  canvas.addEventListener('touchstart', e => { active = true; scrubX = posFrom(e); drawChart(); }, { passive: true });
+  canvas.addEventListener('touchmove', move, { passive: false });
+  canvas.addEventListener('touchend', end);
+  canvas.addEventListener('touchcancel', end);
+})();
 
 // Dashboard
 function renderDashboard() {

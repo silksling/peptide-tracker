@@ -399,6 +399,85 @@ nav::-webkit-scrollbar { display: none; width: 0; height: 0; }
   margin-bottom: 16px;
 }
 
+.peptide-tabs {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 6px;
+  margin-bottom: 12px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.peptide-tabs::-webkit-scrollbar { display: none; }
+
+.peptide-tab {
+  flex: 0 0 auto;
+  padding: 7px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.2s, color 0.2s, border-color 0.2s;
+}
+
+.peptide-toggle-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+}
+
+.peptide-toggle-row:last-child { border-bottom: none; }
+
+.peptide-toggle-row input[type="checkbox"] {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  margin: 2px 0 0;
+  accent-color: var(--accent);
+}
+
+.peptide-toggle-row input:disabled { opacity: 0.5; }
+
+.peptide-dot {
+  flex: 0 0 auto;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-top: 6px;
+}
+
+.peptide-toggle-text { display: flex; flex-direction: column; gap: 2px; }
+.peptide-toggle-name { font-size: 14px; font-weight: 600; }
+.peptide-toggle-name em { font-style: normal; font-size: 11px; color: var(--text-muted); font-weight: 500; }
+.peptide-toggle-desc { font-size: 11px; color: var(--text-muted); line-height: 1.4; }
+
+.pk-note {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 10px;
+  line-height: 1.5;
+}
+
+.peptide-badge {
+  display: inline-block;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #fff;
+  vertical-align: middle;
+  margin-right: 6px;
+}
+
 .chart-range, .levels-range {
   padding: 6px 14px;
   border: 1px solid var(--border);
@@ -1436,7 +1515,7 @@ nav::-webkit-scrollbar { display: none; width: 0; height: 0; }
           <div class="stat-card">
             <span class="stat-label">Current Dose</span>
             <span class="stat-value" id="stat-current-dose">--</span>
-            <span class="stat-unit">mg</span>
+            <span class="stat-unit" id="stat-current-dose-unit">mg</span>
           </div>
           <div class="stat-card">
             <span class="stat-label">Protocol Week</span>
@@ -1522,22 +1601,13 @@ nav::-webkit-scrollbar { display: none; width: 0; height: 0; }
               </div>
             </div>
             <div class="form-group">
-              <label for="dose-amount">Dose (mg)</label>
-              <select id="dose-amount" required>
-                <option value="">Select dose</option>
-                <optgroup label="Escalation (Weeks 1-4)">
-                  <option value="2">2 mg</option>
-                </optgroup>
-                <optgroup label="Escalation (Weeks 5-8)">
-                  <option value="4">4 mg</option>
-                </optgroup>
-                <optgroup label="Escalation (Weeks 9-12)">
-                  <option value="8">8 mg</option>
-                </optgroup>
-                <optgroup label="Maintenance (Weeks 13-48)">
-                  <option value="12">12 mg</option>
-                </optgroup>
-              </select>
+              <label for="dose-peptide">Peptide</label>
+              <select id="dose-peptide" required></select>
+            </div>
+            <div class="form-group">
+              <label for="dose-amount"><span id="dose-amount-label">Dose (mg)</span></label>
+              <select id="dose-amount" required></select>
+              <input type="number" id="dose-amount-custom" step="0.01" min="0" placeholder="Or enter custom amount" style="margin-top:8px;">
             </div>
             <div class="form-group">
               <label for="dose-site">Injection Site</label>
@@ -1578,11 +1648,12 @@ nav::-webkit-scrollbar { display: none; width: 0; height: 0; }
 
       <!-- Levels View -->
       <section id="view-levels" class="view">
+        <div class="peptide-tabs" id="levels-peptide-tabs"></div>
         <div class="stats-row">
           <div class="stat-card">
             <span class="stat-label">In System</span>
             <span class="stat-value" id="stat-current-level">--</span>
-            <span class="stat-unit">mg</span>
+            <span class="stat-unit levels-unit">mg</span>
           </div>
           <div class="stat-card">
             <span class="stat-label">Steady State</span>
@@ -1611,33 +1682,8 @@ nav::-webkit-scrollbar { display: none; width: 0; height: 0; }
         </div>
         <div class="pk-info">
           <h2>Pharmacokinetics</h2>
-          <div class="pk-params">
-            <div class="pk-row">
-              <span class="pk-label">Elimination Half-Life</span>
-              <span class="pk-value">~6 days (144 hrs)</span>
-            </div>
-            <div class="pk-row">
-              <span class="pk-label">Time to Peak (Tmax)</span>
-              <span class="pk-value">24-48 hours</span>
-            </div>
-            <div class="pk-row">
-              <span class="pk-label">PK Profile</span>
-              <span class="pk-value">Dose-proportional</span>
-            </div>
-            <div class="pk-row">
-              <span class="pk-label">Steady State Reached</span>
-              <span class="pk-value">~4-5 weeks</span>
-            </div>
-            <div class="pk-row">
-              <span class="pk-label">Full Clearance (97%)</span>
-              <span class="pk-value">~30 days (5 half-lives)</span>
-            </div>
-            <div class="pk-row">
-              <span class="pk-label">Mechanism</span>
-              <span class="pk-value">Fatty diacid–albumin binding</span>
-            </div>
-          </div>
-          <p class="pk-disclaimer">PK model based on Jastreboff et al., N Engl J Med 2023;389:514-26 (Phase 2 TRIUMPH trial) and Urva et al., Lancet 2022;400:1869-81 (Phase 1b). Individual levels vary with metabolism, injection site, and body composition. Not a substitute for lab monitoring.</p>
+          <div class="pk-params" id="pk-params"></div>
+          <p class="pk-note" id="pk-note"></p>
         </div>
       </section>
 
@@ -1645,6 +1691,7 @@ nav::-webkit-scrollbar { display: none; width: 0; height: 0; }
       <section id="view-calc" class="view">
         <div class="form-card">
           <h2>Dose Calculator</h2>
+          <div class="peptide-tabs" id="calc-peptide-tabs"></div>
           <div class="form-group">
             <label>Device</label>
             <div class="calc-preset-grid" id="calc-device" style="grid-template-columns: repeat(2, 1fr);">
@@ -1866,6 +1913,10 @@ nav::-webkit-scrollbar { display: none; width: 0; height: 0; }
             <label>Concentration (mg/ml)</label>
             <input type="number" id="cart-new-conc" step="0.1" min="0.1" placeholder="e.g. 10">
           </div>
+          <div class="form-group">
+            <label for="cart-new-peptide">Peptide</label>
+            <select id="cart-new-peptide"></select>
+          </div>
           <button class="btn-primary" id="cart-add-btn" style="width:100%;">Add Cartridge</button>
         </div>
 
@@ -1887,9 +1938,14 @@ nav::-webkit-scrollbar { display: none; width: 0; height: 0; }
 
       <!-- Protocol View -->
       <section id="view-protocol" class="view">
+        <div class="form-card">
+          <h2>Peptides Tracked</h2>
+          <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px;">Pick which peptides appear in dose logging, levels, and the calculator.</p>
+          <div id="peptide-toggles"></div>
+        </div>
         <div class="protocol-info">
-          <h2>Retatrutide Protocol</h2>
-          <p class="protocol-desc">GLP-1/GIP/Glucagon triple receptor agonist. Weekly subcutaneous injection with dose escalation.</p>
+          <h2 id="protocol-title">Retatrutide Protocol</h2>
+          <p class="protocol-desc" id="protocol-desc">GLP-1/GIP/Glucagon triple receptor agonist. Weekly subcutaneous injection with dose escalation.</p>
         </div>
         <div class="form-card">
           <h2>Protocol Settings</h2>
@@ -1998,10 +2054,81 @@ function getActiveProfile() {
   return getProfiles().find(p => p.id === id) || null;
 }
 
+// Peptide registry. Half-lives are subcutaneous plasma values; ka is tuned so
+// tmax lands in the reported range. Absolute levels depend on F, which is only
+// well characterised for retatrutide -- the others are best read as relative
+// curve shape (when a dose peaks and how long it lingers), not true plasma
+// concentration.
+function hexToRgba(hex, a) {
+  const h = hex.replace('#', '');
+  const n = parseInt(h.length === 3 ? h.split('').map(c => c + c).join('') : h, 16);
+  return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${a})`;
+}
+
+const PEPTIDES = {
+  retatrutide: {
+    name: 'Retatrutide', short: 'Reta', unit: 'mg', color: '#6c5ce7',
+    halfLife: 144, ka: 0.077, F: 0.95,
+    doses: [1, 2, 4, 8, 12], intervalHours: 168, cadence: 'Weekly',
+    vialPresets: [5, 10, 15, 20, 30], affectsWeight: true,
+    guidance: {
+      range: '2-12 mg/week sub-Q',
+      titration: 'Start 1 mg/week, titrate to 4-8 mg/week over 8-12 weeks',
+      cycle: '24-48+ weeks',
+      timing: 'Weekly subcutaneous injection',
+      notes: 'Still investigational; GI effects and elevated heart rate noted',
+    },
+  },
+  tesamorelin: {
+    name: 'Tesamorelin', short: 'Tesa', unit: 'mg', color: '#00b894',
+    halfLife: 0.6, ka: 6, F: 0.04,
+    doses: [1, 2], intervalHours: 24, cadence: 'Daily',
+    vialPresets: [2, 5, 10], affectsWeight: false,
+    guidance: {
+      range: '1-2 mg/day sub-Q',
+      cycle: '12+ weeks',
+      timing: 'Daily subcutaneous injection',
+      notes: "FDA-approved dosing exists; don't mix formulation strengths",
+    },
+  },
+  ipamorelin: {
+    name: 'Ipamorelin', short: 'Ipa', unit: 'mcg', color: '#fdcb6e',
+    halfLife: 2, ka: 2.2, F: 0.7,
+    doses: [100, 200, 300], intervalHours: 24, cadence: 'Daily',
+    vialPresets: [5, 10, 15], affectsWeight: false,
+    guidance: {
+      range: '100-300 mcg/day sub-Q',
+      cycle: '8-12 weeks, then 3-4 weeks off',
+      timing: 'Inject 30-60 min before bed for best GH pulse',
+    },
+  },
+  ghkcu: {
+    name: 'GHK-Cu', short: 'GHK', unit: 'mg', color: '#e17055',
+    halfLife: 1.2, ka: 2.8, F: 0.8,
+    doses: [1, 2], intervalHours: 24, cadence: 'Daily',
+    vialPresets: [50, 100], affectsWeight: false,
+    guidance: {
+      range: '1-2 mg/day sub-Q (topical: 1-5% cream/serum, 1-2x daily)',
+      cycle: '4-8 weeks, then 2-4 weeks off',
+      timing: 'Topical most common; injectable for anti-aging/wound protocols',
+    },
+  },
+};
+
+const DEFAULT_PEPTIDE = 'retatrutide';
+
+// The peptide the weight-loss views key off: the first tracked one that
+// affects weight, falling back to the first tracked peptide.
+function getPrimaryPeptideKey() {
+  const tracked = getTrackedPeptides();
+  return tracked.find(k => PEPTIDES[k].affectsWeight) || tracked[0] || DEFAULT_PEPTIDE;
+}
+
 const STORAGE_KEYS = {
   get weights() { return 'pt_weights_' + getActiveProfileId(); },
   get doses() { return 'pt_doses_' + getActiveProfileId(); },
   get protocol() { return 'pt_protocol_' + getActiveProfileId(); },
+  get peptides() { return 'pt_peptides_' + getActiveProfileId(); },
 };
 
 function renderProfilePicker() {
@@ -2091,8 +2218,15 @@ function getWeights() {
   return load(STORAGE_KEYS.weights) || [];
 }
 
+// Doses logged before multi-peptide support have no peptide field; they were
+// all retatrutide.
 function getDoses() {
-  return load(STORAGE_KEYS.doses) || [];
+  const doses = load(STORAGE_KEYS.doses) || [];
+  return doses.map(d => (d.peptide ? d : { ...d, peptide: DEFAULT_PEPTIDE }));
+}
+
+function getDosesFor(pepKey) {
+  return getDoses().filter(d => peptideKeyOf(d) === pepKey);
 }
 
 function getProtocol() {
@@ -2220,30 +2354,118 @@ document.getElementById('dose-date').value = todayStr();
 document.getElementById('dose-time').value = new Date().toTimeString().slice(0, 5);
 updateSiteSuggestion();
 
+function populatePeptideSelect() {
+  const sel = document.getElementById('dose-peptide');
+  const tracked = getTrackedPeptides();
+  const prev = sel.value;
+  sel.innerHTML = tracked.map(k =>
+    `<option value="${k}">${PEPTIDES[k].name}</option>`).join('');
+  sel.value = tracked.includes(prev) ? prev : tracked[0];
+  populateDoseOptions();
+
+  const cartSel = document.getElementById('cart-new-peptide');
+  if (cartSel) {
+    const cprev = cartSel.value;
+    cartSel.innerHTML = tracked.map(k =>
+      `<option value="${k}">${PEPTIDES[k].name}</option>`).join('');
+    cartSel.value = tracked.includes(cprev) ? cprev : tracked[0];
+  }
+}
+
+function populateDoseOptions() {
+  const pepKey = document.getElementById('dose-peptide').value || DEFAULT_PEPTIDE;
+  const p = PEPTIDES[pepKey] || PEPTIDES[DEFAULT_PEPTIDE];
+  const sel = document.getElementById('dose-amount');
+  sel.innerHTML = '<option value="">Select dose</option>' +
+    p.doses.map(d => `<option value="${d}">${d} ${p.unit}</option>`).join('');
+  document.getElementById('dose-amount-label').textContent = `Dose (${p.unit})`;
+  document.getElementById('dose-amount-custom').placeholder = `Or enter custom (${p.unit})`;
+  document.getElementById('dose-amount-custom').value = '';
+}
+
+document.getElementById('dose-peptide').addEventListener('change', populateDoseOptions);
+document.getElementById('dose-amount').addEventListener('change', () => {
+  if (document.getElementById('dose-amount').value) {
+    document.getElementById('dose-amount-custom').value = '';
+  }
+});
+document.getElementById('dose-amount-custom').addEventListener('input', () => {
+  if (document.getElementById('dose-amount-custom').value) {
+    document.getElementById('dose-amount').value = '';
+  }
+});
+populatePeptideSelect();
+
 document.getElementById('dose-form').addEventListener('submit', e => {
   e.preventDefault();
   const date = document.getElementById('dose-date').value;
   const time = document.getElementById('dose-time').value || '09:00';
-  const amount = parseFloat(document.getElementById('dose-amount').value);
+  const custom = parseFloat(document.getElementById('dose-amount-custom').value);
+  const picked = parseFloat(document.getElementById('dose-amount').value);
+  const amount = !isNaN(custom) && custom > 0 ? custom : picked;
+  const peptide = document.getElementById('dose-peptide').value || DEFAULT_PEPTIDE;
   const site = document.getElementById('dose-site').value;
   const notes = document.getElementById('dose-notes').value.trim();
-  if (!date || isNaN(amount)) return;
+  if (!date || isNaN(amount) || amount <= 0) return;
 
   const sideEffects = [...document.querySelectorAll('.side-effect-chip.selected')].map(c => c.dataset.effect);
 
   const doses = getDoses();
-  doses.push({ date, time, amount, site, notes, sideEffects, id: Date.now().toString() });
+  doses.push({ date, time, amount, peptide, site, notes, sideEffects, id: Date.now().toString() });
   doses.sort((a, b) => `${a.date}T${a.time || '09:00'}`.localeCompare(`${b.date}T${b.time || '09:00'}`));
   save(STORAGE_KEYS.doses, doses);
 
   document.getElementById('dose-amount').value = '';
+  document.getElementById('dose-amount-custom').value = '';
   document.getElementById('dose-site').value = '';
   document.getElementById('dose-notes').value = '';
   document.querySelectorAll('.side-effect-chip.selected').forEach(c => c.classList.remove('selected'));
-  showToast(`Dose logged: ${amount} mg`);
+  showToast(`${PEPTIDES[peptide].name} logged: ${formatDoseAmount(amount, peptide)}`);
   renderDoseHistory();
   updateSiteSuggestion();
+  renderDashboard();
 });
+
+const PEPTIDE_BLURBS = {
+  retatrutide: 'GLP-1/GIP/Glucagon triple agonist. Weekly SC injection with dose escalation.',
+  tesamorelin: 'GHRH analog. Daily SC injection; very short plasma half-life.',
+  ipamorelin: 'Selective GH secretagogue. Daily SC injection, dosed in mcg.',
+  ghkcu: 'Copper tripeptide. Daily SC injection or topical application.',
+};
+
+function renderPeptideToggles() {
+  const wrap = document.getElementById('peptide-toggles');
+  if (!wrap) return;
+  const tracked = getTrackedPeptides();
+  wrap.innerHTML = Object.keys(PEPTIDES).map(k => {
+    const p = PEPTIDES[k];
+    const on = tracked.includes(k);
+    const isPrimary = k === DEFAULT_PEPTIDE;
+    return `
+      <label class="peptide-toggle-row">
+        <input type="checkbox" data-peptide="${k}" ${on ? 'checked' : ''} ${isPrimary ? 'disabled' : ''}>
+        <span class="peptide-dot" style="background:${p.color}"></span>
+        <span class="peptide-toggle-text">
+          <span class="peptide-toggle-name">${p.name}${isPrimary ? ' <em>(always on)</em>' : ''}</span>
+          <span class="peptide-toggle-desc">${PEPTIDE_BLURBS[k]}</span>
+        </span>
+      </label>`;
+  }).join('');
+
+  wrap.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+    cb.addEventListener('change', () => {
+      const list = [...wrap.querySelectorAll('input[type="checkbox"]')]
+        .filter(c => c.checked || c.disabled)
+        .map(c => c.dataset.peptide);
+      saveTrackedPeptides(list);
+      populatePeptideSelect();
+      renderLevelsPeptideTabs();
+      renderCalcPeptideTabs();
+      renderDashboard();
+      showToast(`${PEPTIDES[cb.dataset.peptide].name} ${cb.checked ? 'added' : 'removed'}`);
+    });
+  });
+}
 
 // Protocol form
 function loadProtocolForm() {
@@ -2346,11 +2568,16 @@ function renderDoseHistory() {
     if (d.notes) details.push(d.notes);
     const effectsHtml = d.sideEffects && d.sideEffects.length
       ? `<span class="history-detail">${d.sideEffects.map(e => e.replace('-', ' ')).join(', ')}</span>` : '';
+    const pk = peptideKeyOf(d);
+    const p = PEPTIDES[pk];
     return `
       <div class="history-item">
         <div class="history-item-left">
           <span class="history-date">${formatDate(d.date)}</span>
-          <span class="history-value">${d.amount} mg</span>
+          <span class="history-value">
+            <span class="peptide-badge" style="background:${p.color}">${p.name}</span>
+            ${formatDoseAmount(d.amount, pk)}
+          </span>
           ${details.length ? `<span class="history-detail">${details.join(' · ')}</span>` : ''}
           ${effectsHtml}
         </div>
@@ -2376,6 +2603,16 @@ function renderDoseHistory() {
 function renderProtocol() {
   const protocol = getProtocol();
   const container = document.getElementById('protocol-timeline');
+
+  const primary = PEPTIDES[getPrimaryPeptideKey()];
+  const titleEl = document.getElementById('protocol-title');
+  const descEl = document.getElementById('protocol-desc');
+  if (titleEl) titleEl.textContent = `${primary.name} Protocol`;
+  if (descEl) {
+    const g = primary.guidance || {};
+    descEl.textContent = [PEPTIDE_BLURBS[getPrimaryPeptideKey()], g.titration || g.range]
+      .filter(Boolean).join(' ');
+  }
 
   if (!protocol) {
     container.innerHTML = '<div class="empty-state">Set your protocol start date above to see the escalation timeline.</div>';
@@ -2600,7 +2837,10 @@ function drawChart() {
 
   // Each consecutive pair is its own segment, colored by the dose in effect
   // at that point so the slope of each interval reads against its dose.
-  const allDoses = getDoses().slice().sort((a, b) => doseTimestamp(a) - doseTimestamp(b));
+  // Only the weight-affecting peptide colors this chart; logging ipamorelin
+  // alongside retatrutide should not relabel the weight trend.
+  const weightPepKey = getPrimaryPeptideKey();
+  const allDoses = getDosesFor(weightPepKey).sort((a, b) => doseTimestamp(a) - doseTimestamp(b));
   const doseAt = t => {
     let found = null;
     for (const d of allDoses) {
@@ -2659,7 +2899,7 @@ function drawChart() {
 
   segments.forEach(seg => {
     if (seg.amt == null) return;
-    const text = `${seg.amt}mg`;
+    const text = `${seg.amt}${PEPTIDES[weightPepKey].unit}`;
     const w = ctx.measureText(text).width + 14;
     const x0 = xScale(seg.i - 1), x1 = xScale(seg.i);
     let cx = (x0 + x1) / 2;
@@ -2741,7 +2981,7 @@ function drawChart() {
 
     const amt = doseAt(new Date(weights[near].date + 'T23:59:59').getTime());
     const l1 = `${values[near].toFixed(1)} lbs`;
-    const l2 = formatDateShort(weights[near].date) + (amt != null ? ` · ${amt}mg` : '');
+    const l2 = formatDateShort(weights[near].date) + (amt != null ? ` · ${amt}${PEPTIDES[weightPepKey].unit}` : '');
     ctx.font = '600 12px -apple-system, sans-serif';
     const w1 = ctx.measureText(l1).width;
     ctx.font = '11px -apple-system, sans-serif';
@@ -2903,9 +3143,16 @@ function renderDashboard() {
     }
   }
 
+  // "Current dose" tracks the weight-affecting peptide so it stays meaningful
+  // when other peptides are logged alongside it.
+  const primaryKey = getPrimaryPeptideKey();
+  const primaryDoses = doses.filter(d => peptideKeyOf(d) === primaryKey);
+  if (primaryDoses.length) {
+    const last = primaryDoses[primaryDoses.length - 1];
+    document.getElementById('stat-current-dose').textContent = last.amount;
+    document.getElementById('stat-current-dose-unit').textContent = PEPTIDES[primaryKey].unit;
+  }
   if (doses.length) {
-    const lastDose = doses[doses.length - 1].amount;
-    document.getElementById('stat-current-dose').textContent = lastDose;
     document.getElementById('stat-shots-taken').textContent = doses.length;
   }
 
@@ -2918,11 +3165,12 @@ function renderDashboard() {
 
   // Next shot countdown
   const nextShotSection = document.getElementById('next-shot-section');
-  if (doses.length) {
+  if (primaryDoses.length) {
     nextShotSection.hidden = false;
-    const lastDoseEntry = doses[doses.length - 1];
+    const lastDoseEntry = primaryDoses[primaryDoses.length - 1];
     const lastDoseTime = doseTimestamp(lastDoseEntry);
-    const nextDoseTime = lastDoseTime + 7 * 24 * 3600000;
+    const intervalMs = PEPTIDES[primaryKey].intervalHours * 3600000;
+    const nextDoseTime = lastDoseTime + intervalMs;
     const now = Date.now();
     const msLeft = nextDoseTime - now;
     const daysLeft = msLeft / (1000 * 60 * 60 * 24);
@@ -2942,8 +3190,8 @@ function renderDashboard() {
     document.getElementById('next-shot-date').textContent = nextDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) + ' at ' + nextDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 
     // Ring progress (0 = just injected, 1 = due)
-    const elapsed = 7 * 24 * 3600000 - msLeft;
-    const progress = Math.min(1, Math.max(0, elapsed / (7 * 24 * 3600000)));
+    const elapsed = intervalMs - msLeft;
+    const progress = Math.min(1, Math.max(0, elapsed / intervalMs));
     const circumference = 2 * Math.PI * 34;
     const offset = circumference * (1 - progress);
     const ring = document.getElementById('next-shot-ring-fill');
@@ -2979,42 +3227,72 @@ function renderDashboard() {
   if (!recentDoses.length) {
     recentContainer.innerHTML = '<div class="empty-state">No doses logged yet.</div>';
   } else {
-    recentContainer.innerHTML = recentDoses.map(d => `
+    recentContainer.innerHTML = recentDoses.map(d => {
+      const dk = peptideKeyOf(d);
+      const dp = PEPTIDES[dk];
+      return `
       <div class="history-item">
         <div class="history-item-left">
           <span class="history-date">${formatDate(d.date)}</span>
-          <span class="history-value">${d.amount} mg</span>
+          <span class="history-value">
+            <span class="peptide-badge" style="background:${dp.color}">${dp.name}</span>
+            ${formatDoseAmount(d.amount, dk)}
+          </span>
         </div>
-      </div>`).join('');
+      </div>`;
+    }).join('');
   }
 
   drawChart();
   drawDashLevelsChart();
 }
 
-// Pharmacokinetic model
-const PK = {
-  halfLife: 144,
-  tmax: 36,
-  ke: Math.LN2 / 144,
-  ka: 0.077,
-  bioavailability: 0.95,
-};
 
-function pkAmount(doseAmount, hoursAfterDose) {
-  if (hoursAfterDose < 0) return 0;
-  const t = hoursAfterDose;
-  const { ka, ke, bioavailability: F } = PK;
-  return F * doseAmount * (ka / (ka - ke)) * (Math.exp(-ke * t) - Math.exp(-ka * t));
+function peptideKeyOf(dose) {
+  return dose && PEPTIDES[dose.peptide] ? dose.peptide : DEFAULT_PEPTIDE;
 }
 
+function peptideOf(dose) {
+  return PEPTIDES[peptideKeyOf(dose)];
+}
+
+// Which peptides this profile is tracking. Retatrutide is always present so
+// existing data keeps a home.
+function getTrackedPeptides() {
+  const saved = load(STORAGE_KEYS.peptides);
+  const list = Array.isArray(saved) && saved.length ? saved : [DEFAULT_PEPTIDE];
+  return list.filter(k => PEPTIDES[k]);
+}
+
+function saveTrackedPeptides(list) {
+  const clean = [...new Set(list)].filter(k => PEPTIDES[k]);
+  save(STORAGE_KEYS.peptides, clean.length ? clean : [DEFAULT_PEPTIDE]);
+}
+
+function formatDoseAmount(amount, pepKey) {
+  const p = PEPTIDES[pepKey] || PEPTIDES[DEFAULT_PEPTIDE];
+  const n = Number(amount);
+  const str = Number.isInteger(n) ? String(n) : n.toFixed(2).replace(/0$/, '');
+  return `${str} ${p.unit}`;
+}
+
+function pkAmount(doseAmount, hoursAfterDose, pepKey) {
+  if (hoursAfterDose < 0) return 0;
+  const p = PEPTIDES[pepKey] || PEPTIDES[DEFAULT_PEPTIDE];
+  const ke = Math.LN2 / p.halfLife;
+  const { ka, F } = p;
+  return F * doseAmount * (ka / (ka - ke)) * (Math.exp(-ke * hoursAfterDose) - Math.exp(-ka * hoursAfterDose));
+}
+
+// Levels are only additive within one peptide, so callers pass doses already
+// filtered to a single peptide.
 function computePlasmaLevels(doses, startTime, endTime, stepMs) {
   const points = [];
   for (let t = startTime; t <= endTime; t += stepMs) {
     let total = 0;
     for (const dose of doses) {
       const hoursAfter = (t - doseTimestamp(dose)) / (1000 * 60 * 60);
-      total += pkAmount(dose.amount, hoursAfter);
+      total += pkAmount(dose.amount, hoursAfter, peptideKeyOf(dose));
     }
     points.push({ time: t, level: total });
   }
@@ -3022,9 +3300,85 @@ function computePlasmaLevels(doses, startTime, endTime, stepMs) {
 }
 
 let levelsRange = 30;
+let levelsPeptide = null;
+
+function getLevelsPeptideKey() {
+  const tracked = getTrackedPeptides();
+  if (levelsPeptide && tracked.includes(levelsPeptide)) return levelsPeptide;
+  return getPrimaryPeptideKey();
+}
+
+function renderLevelsPeptideTabs() {
+  const wrap = document.getElementById('levels-peptide-tabs');
+  if (!wrap) return;
+  const tracked = getTrackedPeptides();
+  const active = getLevelsPeptideKey();
+  wrap.style.display = tracked.length > 1 ? '' : 'none';
+  wrap.innerHTML = tracked.map(k => {
+    const p = PEPTIDES[k];
+    const on = k === active;
+    return `<button class="peptide-tab${on ? ' active' : ''}" data-peptide="${k}"
+      style="${on ? `background:${p.color};border-color:${p.color};color:#fff` : ''}">${p.name}</button>`;
+  }).join('');
+  wrap.querySelectorAll('.peptide-tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      levelsPeptide = btn.dataset.peptide;
+      renderLevels();
+    });
+  });
+}
+
+function renderPKPanel(pepKey) {
+  const p = PEPTIDES[pepKey];
+  const ke = Math.LN2 / p.halfLife;
+  const tmax = Math.log(p.ka / ke) / (p.ka - ke);
+  const fmtH = h => h >= 48 ? `~${(h / 24).toFixed(1)} days (${Math.round(h)} hrs)`
+    : h >= 1 ? `~${h.toFixed(1)} hours`
+    : `~${Math.round(h * 60)} minutes`;
+  const clearanceH = p.halfLife * 5;
+  const dosesToSteady = Math.max(1, Math.ceil((5 * p.halfLife) / p.intervalHours));
+
+  const rows = [
+    ['Elimination Half-Life', fmtH(p.halfLife)],
+    ['Time to Peak (Tmax)', fmtH(tmax)],
+    ['Typical Cadence', `${p.cadence} (every ${p.intervalHours}h)`],
+    ['Steady State Reached', `~${dosesToSteady} dose${dosesToSteady === 1 ? '' : 's'}`],
+    ['Full Clearance (97%)', fmtH(clearanceH)],
+    ['Dose Units', p.unit],
+  ];
+  document.getElementById('pk-params').innerHTML = rows.map(([l, v]) =>
+    `<div class="pk-row"><span class="pk-label">${l}</span><span class="pk-value">${v}</span></div>`).join('');
+
+  const modelNote = p.affectsWeight
+    ? 'Curve shape and absolute levels are modelled from published retatrutide PK.'
+    : `${p.name} PK is modelled from published half-life ranges. Read the curve for timing and relative shape rather than as a true plasma concentration.`;
+
+  const g = p.guidance || {};
+  const gRows = [
+    ['Typical Range', g.range],
+    ['Titration', g.titration],
+    ['Cycle Length', g.cycle],
+    ['Timing', g.timing],
+    ['Notes', g.notes],
+  ].filter(([, v]) => v);
+
+  const guidanceHtml = gRows.length ? `
+    <h2 style="margin-top:18px;">Protocol Guidance</h2>
+    <div class="pk-params">
+      ${gRows.map(([l, v]) => `<div class="pk-row"><span class="pk-label">${l}</span><span class="pk-value">${v}</span></div>`).join('')}
+    </div>
+    <p class="pk-note">Guidance summarised from ntnperformance.com. General reference, not medical advice &mdash; confirm anything you act on with your own clinician.</p>` : '';
+
+  document.getElementById('pk-note').innerHTML = modelNote + guidanceHtml;
+}
 
 function renderLevels() {
-  const doses = getDoses();
+  const pepKey = getLevelsPeptideKey();
+  const p = PEPTIDES[pepKey];
+  const doses = getDosesFor(pepKey);
+  renderLevelsPeptideTabs();
+  renderPKPanel(pepKey);
+  document.querySelectorAll('.levels-unit').forEach(el => { el.textContent = p.unit; });
 
   if (!doses.length) {
     document.getElementById('stat-current-level').textContent = '--';
@@ -3043,21 +3397,24 @@ function renderLevels() {
   let currentLevel = 0;
   for (const dose of doses) {
     const hoursAfter = (now - doseTimestamp(dose)) / (1000 * 60 * 60);
-    currentLevel += pkAmount(dose.amount, hoursAfter);
+    currentLevel += pkAmount(dose.amount, hoursAfter, pepKey);
   }
 
   document.getElementById('stat-current-level').textContent = currentLevel.toFixed(2);
 
-  const sameDoseDoses = doses.filter(d => d.amount === lastDose.amount);
-  const weeksAtCurrentDose = sameDoseDoses.length;
-  if (weeksAtCurrentDose >= 5) {
+  // Steady state lands at roughly 5 half-lives, expressed in this peptide's
+  // own dosing intervals.
+  const dosesToSteady = Math.max(1, Math.ceil((5 * p.halfLife) / p.intervalHours));
+  const atCurrentDose = doses.filter(d => d.amount === lastDose.amount).length;
+  if (atCurrentDose >= dosesToSteady) {
     document.getElementById('stat-steady-state').textContent = 'Yes';
   } else {
-    document.getElementById('stat-steady-state').textContent = `${weeksAtCurrentDose}/5 wks`;
+    document.getElementById('stat-steady-state').textContent = `${atCurrentDose}/${dosesToSteady}`;
   }
 
-  if (hoursSinceLastDose < PK.tmax) {
-    const hrsLeft = Math.round(PK.tmax - hoursSinceLastDose);
+  const tmax = Math.log(p.ka / (Math.LN2 / p.halfLife)) / (p.ka - Math.LN2 / p.halfLife);
+  if (hoursSinceLastDose < tmax) {
+    const hrsLeft = Math.max(1, Math.round(tmax - hoursSinceLastDose));
     if (hrsLeft > 24) {
       document.getElementById('stat-time-to-peak').textContent = `${Math.round(hrsLeft / 24)}d ${hrsLeft % 24}h`;
     } else {
@@ -3067,7 +3424,7 @@ function renderLevels() {
     document.getElementById('stat-time-to-peak').textContent = 'Peaked';
   }
 
-  const nextDoseTime = lastDoseTime + 7 * 24 * 3600000;
+  const nextDoseTime = lastDoseTime + p.intervalHours * 3600000;
   const hoursUntilNext = (nextDoseTime - now) / (1000 * 60 * 60);
   if (hoursUntilNext > 0) {
     const days = Math.floor(hoursUntilNext / 24);
@@ -3084,9 +3441,11 @@ function drawDashLevelsChart() {
   drawLevelsChart('dash-levels-chart', 30);
 }
 
-function drawLevelsChart(canvasId, rangeOverride) {
+function drawLevelsChart(canvasId, rangeOverride, pepKeyOverride) {
   const canvas = document.getElementById(canvasId || 'levels-chart');
   if (!canvas) return;
+  const pepKey = pepKeyOverride || getLevelsPeptideKey();
+  const peptide = PEPTIDES[pepKey];
   const ctx = canvas.getContext('2d');
   const dpr = window.devicePixelRatio || 1;
   const rect = canvas.getBoundingClientRect();
@@ -3100,12 +3459,12 @@ function drawLevelsChart(canvasId, rangeOverride) {
 
   ctx.clearRect(0, 0, width, height);
 
-  const doses = getDoses();
+  const doses = getDosesFor(pepKey);
   if (!doses.length) {
     ctx.fillStyle = '#8b8d98';
     ctx.font = '14px -apple-system, sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('Log doses to see plasma level estimates', width / 2, height / 2);
+    ctx.fillText(`Log ${peptide.name} doses to see plasma level estimates`, width / 2, height / 2);
     return;
   }
 
@@ -3164,11 +3523,11 @@ function drawLevelsChart(canvasId, rangeOverride) {
   ctx.fillStyle = '#8b8d98';
   ctx.font = '10px -apple-system, sans-serif';
   ctx.textAlign = 'right';
-  ctx.fillText('mg', pad.left - 8, pad.top - 6);
+  ctx.fillText(peptide.unit, pad.left - 8, pad.top - 6);
 
   // X labels
   const totalDays = (chartEnd - chartStart) / (1000 * 60 * 60 * 24);
-  const labelCount = Math.min(6, Math.ceil(totalDays / 7));
+  const labelCount = Math.max(2, Math.min(6, Math.ceil(totalDays / 7)));
   ctx.fillStyle = '#8b8d98';
   ctx.font = '11px -apple-system, sans-serif';
   ctx.textAlign = 'center';
@@ -3201,7 +3560,7 @@ function drawLevelsChart(canvasId, rangeOverride) {
       ctx.fill();
 
       // Dose label
-      const dLabel = `${dose.amount}mg`;
+      const dLabel = `${dose.amount}${peptide.unit}`;
       ctx.font = '10px -apple-system, sans-serif';
       ctx.textAlign = 'center';
       const dlW = ctx.measureText(dLabel).width + 8;
@@ -3241,14 +3600,14 @@ function drawLevelsChart(canvasId, rangeOverride) {
     // Dot on the curve
     ctx.beginPath();
     ctx.arc(nowX, nowY, 4, 0, Math.PI * 2);
-    ctx.fillStyle = '#00b894';
+    ctx.fillStyle = peptide.color;
     ctx.fill();
     ctx.strokeStyle = '#0f1117';
     ctx.lineWidth = 2;
     ctx.stroke();
 
     // Translucent label with mg and date/time
-    const levelStr = nowLevel.toFixed(2) + 'mg';
+    const levelStr = nowLevel.toFixed(2) + peptide.unit;
     const nowDate = new Date(now);
     const dateStr = nowDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
     const timeStr = nowDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
@@ -3291,8 +3650,8 @@ function drawLevelsChart(canvasId, rangeOverride) {
   // Area fill (past only - solid)
   if (pastPoints.length > 1) {
     const gradient = ctx.createLinearGradient(0, pad.top, 0, pad.top + chartH);
-    gradient.addColorStop(0, 'rgba(0, 184, 148, 0.25)');
-    gradient.addColorStop(1, 'rgba(0, 184, 148, 0.0)');
+    gradient.addColorStop(0, hexToRgba(peptide.color, 0.25));
+    gradient.addColorStop(1, hexToRgba(peptide.color, 0));
     ctx.beginPath();
     ctx.moveTo(xScale(pastPoints[0].time), yScale(pastPoints[0].level));
     for (let i = 1; i < pastPoints.length; i++) {
@@ -3308,8 +3667,8 @@ function drawLevelsChart(canvasId, rangeOverride) {
   // Future area fill (lighter)
   if (futurePoints.length > 1) {
     const gradientF = ctx.createLinearGradient(0, pad.top, 0, pad.top + chartH);
-    gradientF.addColorStop(0, 'rgba(0, 184, 148, 0.10)');
-    gradientF.addColorStop(1, 'rgba(0, 184, 148, 0.0)');
+    gradientF.addColorStop(0, hexToRgba(peptide.color, 0.10));
+    gradientF.addColorStop(1, hexToRgba(peptide.color, 0));
     ctx.beginPath();
     ctx.moveTo(xScale(futurePoints[0].time), yScale(futurePoints[0].level));
     for (let i = 1; i < futurePoints.length; i++) {
@@ -3329,7 +3688,7 @@ function drawLevelsChart(canvasId, rangeOverride) {
     for (let i = 1; i < pastPoints.length; i++) {
       ctx.lineTo(xScale(pastPoints[i].time), yScale(pastPoints[i].level));
     }
-    ctx.strokeStyle = '#00b894';
+    ctx.strokeStyle = peptide.color;
     ctx.lineWidth = 2;
     ctx.lineJoin = 'round';
     ctx.setLineDash([]);
@@ -3343,7 +3702,7 @@ function drawLevelsChart(canvasId, rangeOverride) {
     for (let i = 1; i < futurePoints.length; i++) {
       ctx.lineTo(xScale(futurePoints[i].time), yScale(futurePoints[i].level));
     }
-    ctx.strokeStyle = '#00b894';
+    ctx.strokeStyle = peptide.color;
     ctx.lineWidth = 2;
     ctx.lineJoin = 'round';
     ctx.setLineDash([6, 4]);
@@ -3382,6 +3741,64 @@ setupCalcPresets('calc-peptide-amt', 'peptideAmt');
 setupCalcPresets('calc-bac-water', 'bacWater');
 setupCalcPresets('calc-syringe', 'syringeUnits');
 setupCalcPresets('calc-dose', 'dose');
+
+// The calculator does all its math in mg. Peptides dosed in mcg are converted
+// on the way in and rendered back in their own unit.
+function calcUnitFactor(pepKey) {
+  return PEPTIDES[pepKey].unit === 'mcg' ? 0.001 : 1;
+}
+
+function renderCalcPeptideTabs() {
+  const wrap = document.getElementById('calc-peptide-tabs');
+  if (!wrap) return;
+  const tracked = getTrackedPeptides();
+  if (!calcState.peptide || !tracked.includes(calcState.peptide)) {
+    calcState.peptide = tracked[0] || DEFAULT_PEPTIDE;
+  }
+  wrap.style.display = tracked.length > 1 ? '' : 'none';
+  wrap.innerHTML = tracked.map(k => {
+    const p = PEPTIDES[k];
+    const on = k === calcState.peptide;
+    return `<button class="peptide-tab${on ? ' active' : ''}" data-peptide="${k}"
+      style="${on ? `background:${p.color};border-color:${p.color};color:#fff` : ''}">${p.name}</button>`;
+  }).join('');
+  wrap.querySelectorAll('.peptide-tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      calcState.peptide = btn.dataset.peptide;
+      renderCalcPeptideTabs();
+      rebuildCalcPresets();
+      updateCalc();
+    });
+  });
+}
+
+function rebuildCalcPresets() {
+  const pepKey = calcState.peptide || DEFAULT_PEPTIDE;
+  const p = PEPTIDES[pepKey];
+  const f = calcUnitFactor(pepKey);
+
+  const amtC = document.getElementById('calc-peptide-amt');
+  const defaultAmt = p.vialPresets[Math.min(1, p.vialPresets.length - 1)];
+  amtC.innerHTML = p.vialPresets.map(v =>
+    `<button class="calc-preset${v === defaultAmt ? ' selected' : ''}" data-val="${v}">${v} mg</button>`).join('');
+  calcState.peptideAmt = defaultAmt;
+  document.getElementById('calc-peptide-custom').value = '';
+
+  const doseC = document.getElementById('calc-dose');
+  doseC.innerHTML = p.doses.map((d, i) =>
+    `<button class="calc-preset${i === 0 ? ' selected' : ''}" data-val="${d * f}">${d} ${p.unit}</button>`).join('');
+  calcState.dose = p.doses[0] * f;
+  document.getElementById('calc-dose-custom').value = '';
+  document.getElementById('calc-dose-custom').placeholder = `Or enter custom (${p.unit})`;
+
+  document.querySelectorAll('#calc-dose').forEach(el => {
+    const label = el.parentElement.querySelector('label');
+    if (label) label.childNodes[0].nodeValue = `Desired Dose (${p.unit}) `;
+  });
+
+  setupCalcPresets('calc-peptide-amt', 'peptideAmt');
+  setupCalcPresets('calc-dose', 'dose');
+}
 
 function applyFilterLoss() {
   calcState.filterLoss = calcState.useFilter
@@ -3478,7 +3895,7 @@ document.getElementById('calc-dose-custom').addEventListener('input', e => {
   const val = parseFloat(e.target.value);
   if (!isNaN(val) && val > 0) {
     document.getElementById('calc-dose').querySelectorAll('.calc-preset').forEach(b => b.classList.remove('selected'));
-    calcState.dose = val;
+    calcState.dose = val * calcUnitFactor(calcState.peptide || DEFAULT_PEPTIDE);
     updateCalc();
   }
 });
@@ -3526,6 +3943,9 @@ function updateCalc() {
   const tooLarge = unitsToDraw > syringeUnits;
 
   const isPen = calcState.device === 'pen';
+  const calcPep = PEPTIDES[calcState.peptide || DEFAULT_PEPTIDE];
+  const calcF = calcUnitFactor(calcState.peptide || DEFAULT_PEPTIDE);
+  const doseDisp = `${+(dose / calcF).toFixed(2)} ${calcPep.unit}`;
 
   const maxInj = calcState.maxInjection;
   const exceedsMax = isPen && maxInj > 0 && unitsToDraw > maxInj;
@@ -3539,7 +3959,7 @@ function updateCalc() {
     document.getElementById('calc-instruction').textContent = exceedsMax
       ? `Exceeds pen max (${maxInj}u) — split into ${Math.ceil(unitsToDraw / maxInj)} injections`
       : `Dial pen to ${unitsToDraw}u`;
-    document.getElementById('calc-dose-label').textContent = `That's your ${dose.toFixed(2)}mg dose · ${dosesPerVial} doses per vial`;
+    document.getElementById('calc-dose-label').textContent = `That's your ${doseDisp} dose · ${dosesPerVial} doses per vial`;
     document.getElementById('calc-result').style.borderColor = exceedsMax ? 'var(--red)' : 'var(--green)';
   } else {
     document.getElementById('calc-units').innerHTML = tooLarge
@@ -3550,7 +3970,7 @@ function updateCalc() {
       : `Pull plunger to the ${unitsToDraw}u mark`;
     document.getElementById('calc-dose-label').textContent = tooLarge
       ? 'Try more BAC water or a larger syringe'
-      : `That's your ${dose.toFixed(2)}mg dose`;
+      : `That's your ${doseDisp} dose`;
   }
 
   document.getElementById('calc-conc').textContent = concentration.toFixed(2) + ' mg/ml';
@@ -3683,6 +4103,7 @@ function updateCartridgePlan() {
         capacity: parseFloat(btn.dataset.cap),
         remaining: parseFloat(btn.dataset.ml),
         conc: parseFloat(btn.dataset.conc),
+        peptide: calcState.peptide || DEFAULT_PEPTIDE,
       });
       saveCartridges(carts);
       renderCartridges();
@@ -3769,6 +4190,7 @@ function renderCartridges() {
   }
 
   listEl.innerHTML = carts.map(c => {
+    const cp = PEPTIDES[c.peptide] || PEPTIDES[DEFAULT_PEPTIDE];
     const mgLeft = c.remaining * c.conc;
     const doseMl = set.doseMg / c.conc;
     const perShot = doseMl + primeMl;
@@ -3776,7 +4198,9 @@ function renderCartridges() {
     const pct = c.capacity > 0 ? (c.remaining / c.capacity) * 100 : 0;
     return `<div class="cart-card" data-id="${c.id}">
       <div class="cart-card-head">
-        <span class="cart-card-title">${c.label}</span>
+        <span class="cart-card-title">
+          <span class="peptide-badge" style="background:${cp.color}">${cp.name}</span>${c.label}
+        </span>
         <button class="cart-del" data-act="del" title="Delete">&times;</button>
       </div>
       <div class="cart-scale-wrap">${cartridgeSvg(c)}</div>
@@ -3869,6 +4293,7 @@ document.getElementById('cart-add-btn').addEventListener('click', () => {
     id: String(Date.now()),
     label: label || `Cartridge ${String.fromCharCode(65 + carts.length)}`,
     capacity, remaining: volume, conc,
+    peptide: document.getElementById('cart-new-peptide').value || DEFAULT_PEPTIDE,
   });
   saveCartridges(carts);
   document.getElementById('cart-new-label').value = '';
@@ -3903,6 +4328,7 @@ document.getElementById('export-btn').addEventListener('click', () => {
     weights: getWeights(),
     doses: getDoses(),
     protocol: getProtocol(),
+    peptides: getTrackedPeptides(),
     exportedAt: new Date().toISOString(),
   };
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -3925,6 +4351,10 @@ document.getElementById('import-input').addEventListener('change', async e => {
     if (data.weights) save(STORAGE_KEYS.weights, data.weights);
     if (data.doses) save(STORAGE_KEYS.doses, data.doses);
     if (data.protocol) save(STORAGE_KEYS.protocol, data.protocol);
+    if (data.peptides) saveTrackedPeptides(data.peptides);
+    populatePeptideSelect();
+    renderPeptideToggles();
+    renderCalcPeptideTabs();
     showToast('Data imported successfully');
     renderDashboard();
     renderWeightHistory();
@@ -3946,6 +4376,10 @@ window.addEventListener('resize', () => {
 // Initial render
 function initApp() {
   loadProtocolForm();
+  renderPeptideToggles();
+  populatePeptideSelect();
+  renderCalcPeptideTabs();
+  rebuildCalcPresets();
   updateSiteSuggestion();
   renderDashboard();
   renderWeightHistory();
@@ -3954,6 +4388,7 @@ function initApp() {
   renderProtocol();
   loadCartSettingsForm();
   renderCartridges();
+  updateCalc();
 }
 if (getActiveProfileId()) initApp();
   </script>

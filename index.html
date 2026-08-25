@@ -403,6 +403,37 @@ nav::-webkit-scrollbar { display: none; width: 0; height: 0; }
   margin-bottom: 16px;
 }
 
+#update-banner {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  bottom: calc(12px + env(safe-area-inset-bottom, 0));
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  background: var(--accent);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+#update-banner button {
+  flex: 0 0 auto;
+  padding: 7px 14px;
+  border: none;
+  border-radius: 999px;
+  background: #fff;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
 .version-row {
   display: flex;
   align-items: center;
@@ -4346,7 +4377,7 @@ loadCartSettingsForm();
 renderCartridges();
 
 // Export / Import
-document.getElementById('force-refresh-btn').addEventListener('click', forceRefresh);
+document.getElementById('force-refresh-btn').addEventListener('click', () => checkForUpdate(true));
 
 document.getElementById('export-btn').addEventListener('click', () => {
   const data = {
@@ -4410,6 +4441,38 @@ function forceRefresh() {
   location.replace(url.toString());
 }
 
+// Fetches the deployed copy of this page past the cache and compares its
+// APP_VERSION to the running one. Without this an iOS home-screen webapp can
+// sit on a stale build indefinitely with no sign anything shipped.
+async function checkForUpdate(announceWhenCurrent) {
+  const btn = document.getElementById('force-refresh-btn');
+  try {
+    if (btn) btn.textContent = 'Checking...';
+    const res = await fetch(location.pathname + '?vc=' + Date.now().toString(36), { cache: 'no-store' });
+    if (!res.ok) throw new Error('fetch failed');
+    const text = await res.text();
+    const m = text.match(/const APP_VERSION = '([^']+)'/);
+    if (m && m[1] !== APP_VERSION) {
+      showUpdateBanner(m[1]);
+    } else if (announceWhenCurrent) {
+      showToast('You are on the latest version');
+    }
+  } catch {
+    if (announceWhenCurrent) showToast('Could not check for updates', 'error');
+  } finally {
+    if (btn) btn.textContent = 'Check for update';
+  }
+}
+
+function showUpdateBanner(newVersion) {
+  if (document.getElementById('update-banner')) return;
+  const bar = document.createElement('div');
+  bar.id = 'update-banner';
+  bar.innerHTML = `<span>Update available (${newVersion})</span><button type="button">Reload</button>`;
+  bar.querySelector('button').addEventListener('click', forceRefresh);
+  document.body.appendChild(bar);
+}
+
 function initApp() {
   const vEl = document.getElementById('app-version');
   if (vEl) vEl.textContent = APP_VERSION;
@@ -4427,6 +4490,7 @@ function initApp() {
   loadCartSettingsForm();
   renderCartridges();
   updateCalc();
+  checkForUpdate(false);
 }
 if (getActiveProfileId()) initApp();
   </script>

@@ -8,6 +8,10 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Peptide Tracker">
   <meta name="theme-color" content="#0f1117">
+  <!-- iOS standalone webapps cache hard; ask for revalidation on every load. -->
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="icon-180.png">
   <style>
@@ -398,6 +402,21 @@ nav::-webkit-scrollbar { display: none; width: 0; height: 0; }
   gap: 4px;
   margin-bottom: 16px;
 }
+
+.version-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.version-row strong { color: var(--text); font-weight: 600; }
+.version-row .btn-secondary { padding: 7px 12px; font-size: 12px; width: auto; }
 
 .peptide-tabs {
   display: flex;
@@ -1981,6 +2000,10 @@ nav::-webkit-scrollbar { display: none; width: 0; height: 0; }
               Import Data
               <input type="file" id="import-input" accept=".json" hidden>
             </label>
+          </div>
+          <div class="version-row">
+            <span>Version <strong id="app-version"></strong></span>
+            <button class="btn-secondary" id="force-refresh-btn">Check for update</button>
           </div>
         </div>
       </section>
@@ -4323,6 +4346,8 @@ loadCartSettingsForm();
 renderCartridges();
 
 // Export / Import
+document.getElementById('force-refresh-btn').addEventListener('click', forceRefresh);
+
 document.getElementById('export-btn').addEventListener('click', () => {
   const data = {
     weights: getWeights(),
@@ -4374,7 +4399,20 @@ window.addEventListener('resize', () => {
 });
 
 // Initial render
+// Bumped whenever a build ships so the running version is visible in-app.
+const APP_VERSION = '2026.08.25-multipeptide';
+
+// Reloads bypassing the HTTP cache. GitHub Pages serves max-age=600 and iOS
+// standalone webapps hold on longer still, so the cache-buster is explicit.
+function forceRefresh() {
+  const url = new URL(location.href);
+  url.searchParams.set('v', Date.now().toString(36));
+  location.replace(url.toString());
+}
+
 function initApp() {
+  const vEl = document.getElementById('app-version');
+  if (vEl) vEl.textContent = APP_VERSION;
   loadProtocolForm();
   renderPeptideToggles();
   populatePeptideSelect();

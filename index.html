@@ -346,8 +346,11 @@ nav::-webkit-scrollbar { display: none; width: 0; height: 0; }
 .cart-dose-input {
   flex: 1 1 auto;
   min-width: 0;
-  padding: 7px 9px;
-  font-size: 14px;
+  padding: 10px 9px;
+  /* 16px keeps iOS from zooming the page on focus; 44px is the minimum
+     comfortable tap target. */
+  font-size: 16px;
+  min-height: 44px;
   font-weight: 600;
   background: var(--bg-card);
   border: 1px solid var(--border);
@@ -4961,7 +4964,7 @@ function renderCartridges() {
       <input type="range" class="cart-slider" data-act="slider" min="0" max="${c.capacity}" step="0.01" value="${c.remaining}">
       <div class="cart-dose-row">
         <label>Injection</label>
-        <input type="number" class="cart-dose-input" data-act="dose" step="${step}" min="0" value="${doseAmt}">
+        <input type="number" inputmode="decimal" class="cart-dose-input" data-act="dose" step="${step}" min="0" value="${doseAmt}">
         <span class="cart-dose-unit">${cp.unit}</span>
         <span class="cart-dose-calc">${(doseMl * UNITS_PER_ML).toFixed(0)}u</span>
       </div>
@@ -4994,12 +4997,18 @@ function updateCartridge(id, fn) {
   renderCartridges();
 }
 
+// Only these are click actions. The card also carries data-act="slider" and
+// data-act="dose" on inputs, and without this whitelist tapping the dose
+// field fell through to the prime branch below.
+const CART_CLICK_ACTIONS = ['del', 'refill', 'inject', 'prime'];
+
 document.getElementById('cart-list').addEventListener('click', e => {
   const btn = e.target.closest('[data-act]');
-  if (!btn || btn.dataset.act === 'slider') return;
+  if (!btn) return;
+  const act = btn.dataset.act;
+  if (!CART_CLICK_ACTIONS.includes(act)) return;
   const id = btn.closest('.cart-card').dataset.id;
   const set = getCartSettings();
-  const act = btn.dataset.act;
 
   if (act === 'del') {
     const all = getCartridges();
@@ -5033,6 +5042,7 @@ document.getElementById('cart-list').addEventListener('click', e => {
   const cp = PEPTIDES[c.peptide] || PEPTIDES[DEFAULT_PEPTIDE];
   const primeMl = set.primeUnits / UNITS_PER_ML;
   const need = act === 'inject' ? cartDoseMg(c) / c.conc + primeMl : primeMl;
+
 
   if (c.remaining < need - 1e-9) {
     showToast('Not enough left in this cartridge', 'error');
@@ -5190,7 +5200,7 @@ window.addEventListener('resize', () => {
 
 // Initial render
 // Bumped whenever a build ships so the running version is visible in-app.
-const APP_VERSION = '2026.08.25-ghk-continuous';
+const APP_VERSION = '2026.08.25-dose-tap-fix';
 
 // Reloads bypassing the HTTP cache. GitHub Pages serves max-age=600 and iOS
 // standalone webapps hold on longer still, so the cache-buster is explicit.

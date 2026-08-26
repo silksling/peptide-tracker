@@ -564,6 +564,105 @@ nav::-webkit-scrollbar { display: none; width: 0; height: 0; }
   line-height: 1.5;
 }
 
+.cycle-block {
+  padding: 14px 0;
+  border-bottom: 1px solid var(--border);
+}
+.cycle-block:last-child { border-bottom: none; padding-bottom: 0; }
+.cycle-block:first-child { padding-top: 0; }
+
+.cycle-block-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.cycle-presets {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+.cycle-preset {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 6px;
+  background: var(--bg);
+  border: 2px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  cursor: pointer;
+  text-align: center;
+}
+
+.cycle-preset.selected { border-color: var(--accent); background: rgba(108, 92, 231, 0.12); }
+.cycle-preset-label { font-size: 12px; font-weight: 600; }
+.cycle-preset-weeks { font-size: 10px; color: var(--text-muted); }
+
+.cycle-custom {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--text-muted);
+  flex-wrap: wrap;
+}
+
+.cycle-custom input {
+  width: 58px;
+  padding: 6px 8px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.cycle-custom-tag {
+  margin-left: auto;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(108, 92, 231, 0.15);
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.cycle-info { margin-top: 10px; }
+
+.cycle-info summary {
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+  list-style: none;
+}
+.cycle-info summary::-webkit-details-marker { display: none; }
+.cycle-info summary::before { content: '\25B8  '; }
+.cycle-info[open] summary::before { content: '\25BE  '; }
+
+.cycle-info-body {
+  margin-top: 8px;
+  padding: 10px 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--text-muted);
+}
+.cycle-info-body p { margin-bottom: 8px; }
+.cycle-info-body ul { margin: 0; padding-left: 16px; }
+.cycle-info-body li { margin-bottom: 5px; }
+.cycle-watch { color: var(--text); }
+
 .cycle-chip {
   display: inline-block;
   margin-top: 5px;
@@ -2056,6 +2155,11 @@ nav::-webkit-scrollbar { display: none; width: 0; height: 0; }
           <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px;">Pick which peptides appear in dose logging, levels, and the calculator.</p>
           <div id="peptide-toggles"></div>
         </div>
+        <div class="form-card" id="cycle-planner-card">
+          <h2>Cycle Planner</h2>
+          <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px;">Set your own on/off length for each cycled peptide. Tap <strong>Why cycle this?</strong> for what drives the tradeoff.</p>
+          <div id="cycle-planner"></div>
+        </div>
         <div class="protocol-info">
           <h2 id="protocol-title">Retatrutide Protocol</h2>
           <p class="protocol-desc" id="protocol-desc">GLP-1/GIP/Glucagon triple receptor agonist. Weekly subcutaneous injection with dose escalation.</p>
@@ -2554,16 +2658,70 @@ const PEPTIDE_BLURBS = {
   ghkcu: 'Copper tripeptide. Daily SC injection or topical application.',
 };
 
-// Where this peptide sits in its conservative on/off cycle. A gap of a full
+
+// Context behind each cycle length. Options run shortest to longest so the
+// tradeoff being made is visible, rather than presenting one number as
+// correct. Evidence quality varies sharply between these compounds and the
+// notes say so.
+const CYCLE_INFO = {
+  tesamorelin: {
+    why: 'Tesamorelin is the best-evidenced of the three: it is FDA-approved as Egrifta for HIV-associated lipodystrophy and was studied at 2 mg daily <em>continuously</em>, not cycled. The pivotal trials ran 26 weeks with a 52-week extension. So the case for cycling is not receptor burnout -- it is that GH elevation lowers insulin sensitivity and raises IGF-1 over time, and a break lets both reset.',
+    watch: 'IGF-1 and fasting glucose / HbA1c. Visceral fat returns once you stop, so length here is a maintenance decision as much as a safety one.',
+    options: [
+      { label: 'Conservative', onWeeks: 12, offWeeks: 4, note: 'Shortest run that still shows meaningful visceral fat change. Least metabolic exposure.' },
+      { label: 'Trial standard', onWeeks: 26, offWeeks: 4, note: 'Matches the main registration trials. Where the strongest efficacy data sits.' },
+      { label: 'Extended', onWeeks: 52, offWeeks: 8, note: 'Matches the 52-week extension. Studied, but the most GH exposure -- monitor labs.' },
+    ],
+  },
+  ipamorelin: {
+    why: 'Ipamorelin is a ghrelin-receptor agonist, and that receptor downregulates with sustained stimulation. This is the one where cycling has a real mechanistic basis: run it continuously and the GH pulse you get for a given dose fades. Its selling point over GHRP-2/6 is selectivity -- it raises GH without meaningfully moving cortisol or prolactin. Human data is thin; most dosing convention is community-derived, not trial-derived.',
+    watch: 'Fading effect is the practical signal of desensitisation. IGF-1 if you can test it. Water retention and carpal-tunnel-type symptoms suggest too much GH.',
+    options: [
+      { label: 'Conservative', onWeeks: 8, offWeeks: 4, note: 'Comfortably inside where desensitisation is typically reported. Most common starting point.' },
+      { label: 'Standard', onWeeks: 12, offWeeks: 4, note: 'The usual upper bound in practice. Watch for the effect tapering near the end.' },
+      { label: 'Extended', onWeeks: 16, offWeeks: 6, note: 'Past where most people report the pulse holding up. Needs a longer washout.' },
+    ],
+  },
+  ghkcu: {
+    why: 'The constraint for injected GHK-Cu is copper, not the peptide. Each molecule carries a copper ion, and copper accumulates -- excess intake antagonises zinc absorption and, at sustained high levels, burdens the liver. That is why injectable cycles are the shortest of the three. Topical GHK-Cu is a different question: it delivers far less systemic copper and is commonly used continuously.',
+    watch: 'Zinc status is the first thing to go -- taste changes, immune niggles. Serum copper / ceruloplasmin if you are running longer or stacking other copper sources.',
+    options: [
+      { label: 'Conservative', onWeeks: 4, offWeeks: 4, note: 'Keeps cumulative copper load low. Sensible default for injectable use.' },
+      { label: 'Standard', onWeeks: 6, offWeeks: 4, note: 'Common for wound healing or a defined skin protocol.' },
+      { label: 'Extended', onWeeks: 8, offWeeks: 6, note: 'Upper end for injectable. Worth checking copper and zinc before and after.' },
+    ],
+  },
+};
+
+// Per-profile cycle overrides; falls back to the peptide's built-in default.
+function getCycleSettings() {
+  try { return JSON.parse(localStorage.getItem('pt_cycles_' + getActiveProfileId())) || {}; }
+  catch { return {}; }
+}
+
+function saveCycleSettings(obj) {
+  localStorage.setItem('pt_cycles_' + getActiveProfileId(), JSON.stringify(obj));
+}
+
+function cycleFor(pepKey) {
+  const p = PEPTIDES[pepKey];
+  if (!p || !p.cycle) return null;
+  const saved = getCycleSettings()[pepKey];
+  if (saved && saved.onWeeks > 0 && saved.offWeeks >= 0) return saved;
+  return p.cycle;
+}
+
+// Where this peptide sits in its on/off cycle. A gap of a full
 // off-period breaks the run, so returning after a rest starts week 1 again.
 function cycleStatus(pepKey) {
   const p = PEPTIDES[pepKey];
-  if (!p || !p.cycle) return null;
+  const cyc = cycleFor(pepKey);
+  if (!p || !cyc) return null;
   const doses = getDosesFor(pepKey).slice().sort((a, b) => doseTimestamp(a) - doseTimestamp(b));
   if (!doses.length) return null;
 
   const DAY = 86400000;
-  const offMs = p.cycle.offWeeks * 7 * DAY;
+  const offMs = cyc.offWeeks * 7 * DAY;
   const now = Date.now();
   const times = doses.map(doseTimestamp);
   const last = times[times.length - 1];
@@ -2577,32 +2735,117 @@ function cycleStatus(pepKey) {
 
   const restingMs = now - last;
   if (restingMs >= offMs) {
-    return { state: 'off', weeks: Math.floor(restingMs / (7 * DAY)), cycle: p.cycle,
-             ready: true };
+    return { state: 'off', weeks: Math.floor(restingMs / (7 * DAY)), cycle: cyc, ready: true };
   }
   const weeksOn = (now - runStart) / (7 * DAY);
   const weekNo = Math.floor(weeksOn) + 1;
   return {
-    state: weekNo > p.cycle.onWeeks ? 'over' : 'on',
-    weekNo, cycle: p.cycle,
+    state: weekNo > cyc.onWeeks ? 'over' : 'on',
+    weekNo, cycle: cyc,
     restingWeeks: restingMs / (7 * DAY),
   };
 }
 
 function cycleStatusHtml(pepKey) {
   const st = cycleStatus(pepKey);
-  const p = PEPTIDES[pepKey];
-  if (!p || !p.cycle) return '';
+  const cyc = cycleFor(pepKey);
+  if (!cyc) return '';
   if (!st) {
-    return `<span class="cycle-chip cycle-idle">${p.cycle.onWeeks}w on / ${p.cycle.offWeeks}w off &middot; not started</span>`;
+    return `<span class="cycle-chip cycle-idle">${cyc.onWeeks}w on / ${cyc.offWeeks}w off &middot; not started</span>`;
   }
   if (st.state === 'off') {
     return `<span class="cycle-chip cycle-rest">Resting ${st.weeks}w &middot; clear to restart</span>`;
   }
   if (st.state === 'over') {
-    return `<span class="cycle-chip cycle-over">Week ${st.weekNo} &middot; past ${p.cycle.onWeeks}w &mdash; time to break</span>`;
+    return `<span class="cycle-chip cycle-over">Week ${st.weekNo} &middot; past ${cyc.onWeeks}w &mdash; time to break</span>`;
   }
-  return `<span class="cycle-chip cycle-on">Week ${st.weekNo} of ${p.cycle.onWeeks}</span>`;
+  return `<span class="cycle-chip cycle-on">Week ${st.weekNo} of ${cyc.onWeeks}</span>`;
+}
+
+
+function renderCyclePlanner() {
+  const wrap = document.getElementById('cycle-planner');
+  if (!wrap) return;
+  const tracked = getTrackedPeptides().filter(k => PEPTIDES[k] && PEPTIDES[k].cycle);
+  const card = document.getElementById('cycle-planner-card');
+
+  if (!tracked.length) {
+    if (card) card.style.display = 'none';
+    return;
+  }
+  if (card) card.style.display = '';
+
+  const settings = getCycleSettings();
+
+  wrap.innerHTML = tracked.map(k => {
+    const p = PEPTIDES[k];
+    const info = CYCLE_INFO[k];
+    const cur = cycleFor(k);
+    const isCustom = !info.options.some(o => o.onWeeks === cur.onWeeks && o.offWeeks === cur.offWeeks);
+
+    const presets = info.options.map(o => {
+      const on = o.onWeeks === cur.onWeeks && o.offWeeks === cur.offWeeks;
+      return `<button type="button" class="cycle-preset${on ? ' selected' : ''}"
+        data-pep="${k}" data-on="${o.onWeeks}" data-off="${o.offWeeks}">
+        <span class="cycle-preset-label">${o.label}</span>
+        <span class="cycle-preset-weeks">${o.onWeeks}w on / ${o.offWeeks}w off</span>
+      </button>`;
+    }).join('');
+
+    const notes = info.options.map(o =>
+      `<li><strong>${o.label} (${o.onWeeks}/${o.offWeeks}):</strong> ${o.note}</li>`).join('');
+
+    return `<div class="cycle-block" data-pep="${k}">
+      <div class="cycle-block-head">
+        <span class="peptide-badge" style="background:${p.color}">${p.name}</span>
+        ${cycleStatusHtml(k)}
+      </div>
+      <div class="cycle-presets">${presets}</div>
+      <div class="cycle-custom">
+        <label>On</label>
+        <input type="number" min="1" max="104" step="1" data-pep="${k}" data-field="onWeeks" value="${cur.onWeeks}">
+        <span>wks</span>
+        <label>Off</label>
+        <input type="number" min="0" max="52" step="1" data-pep="${k}" data-field="offWeeks" value="${cur.offWeeks}">
+        <span>wks</span>
+        ${isCustom ? '<span class="cycle-custom-tag">Custom</span>' : ''}
+      </div>
+      <details class="cycle-info">
+        <summary>Why cycle this?</summary>
+        <div class="cycle-info-body">
+          <p>${info.why}</p>
+          <p class="cycle-watch"><strong>Watch for:</strong> ${info.watch}</p>
+          <ul>${notes}</ul>
+        </div>
+      </details>
+    </div>`;
+  }).join('');
+
+  wrap.querySelectorAll('.cycle-preset').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const s = getCycleSettings();
+      s[btn.dataset.pep] = { onWeeks: +btn.dataset.on, offWeeks: +btn.dataset.off };
+      saveCycleSettings(s);
+      renderCyclePlanner();
+      renderPeptideToggles();
+      showToast(`${PEPTIDES[btn.dataset.pep].name}: ${btn.dataset.on}w on / ${btn.dataset.off}w off`);
+    });
+  });
+
+  wrap.querySelectorAll('.cycle-custom input').forEach(inp => {
+    inp.addEventListener('change', () => {
+      const v = parseInt(inp.value, 10);
+      if (isNaN(v) || v < 0) { renderCyclePlanner(); return; }
+      const key = inp.dataset.pep;
+      const s = getCycleSettings();
+      const base = s[key] || cycleFor(key);
+      s[key] = { onWeeks: base.onWeeks, offWeeks: base.offWeeks, [inp.dataset.field]: v };
+      if (s[key].onWeeks < 1) s[key].onWeeks = 1;
+      saveCycleSettings(s);
+      renderCyclePlanner();
+      renderPeptideToggles();
+    });
+  });
 }
 
 function renderPeptideToggles() {
@@ -2631,6 +2874,7 @@ function renderPeptideToggles() {
         .filter(c => c.checked || c.disabled)
         .map(c => c.dataset.peptide);
       saveTrackedPeptides(list);
+      renderCyclePlanner();
       populatePeptideSelect();
       renderLevelsPeptideTabs();
       renderCalcPeptideTabs();
@@ -4612,7 +4856,7 @@ window.addEventListener('resize', () => {
 
 // Initial render
 // Bumped whenever a build ships so the running version is visible in-app.
-const APP_VERSION = '2026.08.25-cartridge-dose';
+const APP_VERSION = '2026.08.25-cycle-planner';
 
 // Reloads bypassing the HTTP cache. GitHub Pages serves max-age=600 and iOS
 // standalone webapps hold on longer still, so the cache-buster is explicit.
@@ -4659,6 +4903,7 @@ function initApp() {
   if (vEl) vEl.textContent = APP_VERSION;
   loadProtocolForm();
   renderPeptideToggles();
+  renderCyclePlanner();
   populatePeptideSelect();
   renderCalcPeptideTabs();
   rebuildCalcPresets();

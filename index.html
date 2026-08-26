@@ -564,6 +564,21 @@ nav::-webkit-scrollbar { display: none; width: 0; height: 0; }
   line-height: 1.5;
 }
 
+.cycle-chip {
+  display: inline-block;
+  margin-top: 5px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 600;
+  border: 1px solid transparent;
+}
+
+.cycle-on { background: rgba(0, 184, 148, 0.15); color: var(--green); border-color: rgba(0, 184, 148, 0.4); }
+.cycle-over { background: rgba(225, 112, 85, 0.15); color: var(--red); border-color: rgba(225, 112, 85, 0.45); }
+.cycle-rest { background: rgba(108, 92, 231, 0.15); color: var(--accent); border-color: rgba(108, 92, 231, 0.4); }
+.cycle-idle { background: var(--bg); color: var(--text-muted); border-color: var(--border); }
+
 .peptide-badge {
   display: inline-block;
   padding: 2px 7px;
@@ -2173,6 +2188,7 @@ const PEPTIDES = {
     halfLife: 144, ka: 0.077, F: 0.95,
     doses: [1, 2, 4, 8, 12], intervalHours: 168, cadence: 'Weekly',
     vialPresets: [5, 10, 15, 20, 30], affectsWeight: true,
+    cycle: null,
     guidance: {
       range: '2-12 mg/week sub-Q',
       titration: 'Start 1 mg/week, titrate to 4-8 mg/week over 8-12 weeks',
@@ -2186,9 +2202,10 @@ const PEPTIDES = {
     halfLife: 0.6, ka: 6, F: 0.04,
     doses: [1, 2], intervalHours: 24, cadence: 'Daily',
     vialPresets: [2, 5, 10], affectsWeight: false,
+    cycle: { onWeeks: 12, offWeeks: 4 },
     guidance: {
       range: '1-2 mg/day sub-Q',
-      cycle: '12+ weeks',
+      cycle: 'Conservative: 12 weeks on, 4 weeks off',
       timing: 'Daily subcutaneous injection',
       notes: "FDA-approved dosing exists; don't mix formulation strengths",
     },
@@ -2198,9 +2215,10 @@ const PEPTIDES = {
     halfLife: 2, ka: 2.2, F: 0.7,
     doses: [100, 200, 300], intervalHours: 24, cadence: 'Daily',
     vialPresets: [5, 10, 15], affectsWeight: false,
+    cycle: { onWeeks: 8, offWeeks: 4 },
     guidance: {
       range: '100-300 mcg/day sub-Q',
-      cycle: '8-12 weeks, then 3-4 weeks off',
+      cycle: 'Conservative: 8 weeks on, 4 weeks off',
       timing: 'Inject 30-60 min before bed for best GH pulse',
     },
   },
@@ -2209,9 +2227,10 @@ const PEPTIDES = {
     halfLife: 1.2, ka: 2.8, F: 0.8,
     doses: [1, 2], intervalHours: 24, cadence: 'Daily',
     vialPresets: [50, 100], affectsWeight: false,
+    cycle: { onWeeks: 4, offWeeks: 4 },
     guidance: {
       range: '1-2 mg/day sub-Q (topical: 1-5% cream/serum, 1-2x daily)',
-      cycle: '4-8 weeks, then 2-4 weeks off',
+      cycle: 'Conservative: 4 weeks on, 4 weeks off',
       timing: 'Topical most common; injectable for anti-aging/wound protocols',
     },
   },
@@ -2535,6 +2554,57 @@ const PEPTIDE_BLURBS = {
   ghkcu: 'Copper tripeptide. Daily SC injection or topical application.',
 };
 
+// Where this peptide sits in its conservative on/off cycle. A gap of a full
+// off-period breaks the run, so returning after a rest starts week 1 again.
+function cycleStatus(pepKey) {
+  const p = PEPTIDES[pepKey];
+  if (!p || !p.cycle) return null;
+  const doses = getDosesFor(pepKey).slice().sort((a, b) => doseTimestamp(a) - doseTimestamp(b));
+  if (!doses.length) return null;
+
+  const DAY = 86400000;
+  const offMs = p.cycle.offWeeks * 7 * DAY;
+  const now = Date.now();
+  const times = doses.map(doseTimestamp);
+  const last = times[times.length - 1];
+
+  // Walk back to the start of the unbroken run.
+  let runStart = times[0];
+  for (let i = times.length - 1; i > 0; i--) {
+    if (times[i] - times[i - 1] >= offMs) { runStart = times[i]; break; }
+    runStart = times[i - 1];
+  }
+
+  const restingMs = now - last;
+  if (restingMs >= offMs) {
+    return { state: 'off', weeks: Math.floor(restingMs / (7 * DAY)), cycle: p.cycle,
+             ready: true };
+  }
+  const weeksOn = (now - runStart) / (7 * DAY);
+  const weekNo = Math.floor(weeksOn) + 1;
+  return {
+    state: weekNo > p.cycle.onWeeks ? 'over' : 'on',
+    weekNo, cycle: p.cycle,
+    restingWeeks: restingMs / (7 * DAY),
+  };
+}
+
+function cycleStatusHtml(pepKey) {
+  const st = cycleStatus(pepKey);
+  const p = PEPTIDES[pepKey];
+  if (!p || !p.cycle) return '';
+  if (!st) {
+    return `<span class="cycle-chip cycle-idle">${p.cycle.onWeeks}w on / ${p.cycle.offWeeks}w off &middot; not started</span>`;
+  }
+  if (st.state === 'off') {
+    return `<span class="cycle-chip cycle-rest">Resting ${st.weeks}w &middot; clear to restart</span>`;
+  }
+  if (st.state === 'over') {
+    return `<span class="cycle-chip cycle-over">Week ${st.weekNo} &middot; past ${p.cycle.onWeeks}w &mdash; time to break</span>`;
+  }
+  return `<span class="cycle-chip cycle-on">Week ${st.weekNo} of ${p.cycle.onWeeks}</span>`;
+}
+
 function renderPeptideToggles() {
   const wrap = document.getElementById('peptide-toggles');
   if (!wrap) return;
@@ -2550,6 +2620,7 @@ function renderPeptideToggles() {
         <span class="peptide-toggle-text">
           <span class="peptide-toggle-name">${p.name}${isPrimary ? ' <em>(always on)</em>' : ''}</span>
           <span class="peptide-toggle-desc">${PEPTIDE_BLURBS[k]}</span>
+          ${on ? cycleStatusHtml(k) : ''}
         </span>
       </label>`;
   }).join('');
@@ -4541,7 +4612,7 @@ window.addEventListener('resize', () => {
 
 // Initial render
 // Bumped whenever a build ships so the running version is visible in-app.
-const APP_VERSION = '2026.08.25-multipeptide';
+const APP_VERSION = '2026.08.25-cartridge-dose';
 
 // Reloads bypassing the HTTP cache. GitHub Pages serves max-age=600 and iOS
 // standalone webapps hold on longer still, so the cache-buster is explicit.

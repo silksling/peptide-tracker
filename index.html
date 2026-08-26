@@ -564,6 +564,83 @@ nav::-webkit-scrollbar { display: none; width: 0; height: 0; }
   line-height: 1.5;
 }
 
+.stack-card {
+  padding: 12px 14px;
+  margin-bottom: 14px;
+  background: linear-gradient(135deg, rgba(0,184,148,0.10), rgba(253,203,110,0.10));
+  border: 1px solid rgba(0,184,148,0.35);
+  border-radius: var(--radius-sm);
+}
+
+.stack-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.stack-name { font-size: 13px; font-weight: 700; color: var(--text); }
+
+.stack-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+  cursor: pointer;
+  margin: 0;
+}
+.stack-toggle input { width: 16px; height: 16px; accent-color: var(--green); margin: 0; }
+
+.stack-why, .stack-caveat, .stack-timing {
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+.stack-timing { color: var(--text); }
+.stack-caveat { margin-bottom: 0; font-style: italic; }
+
+.cycle-linked {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--green);
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(0,184,148,0.15);
+  border: 1px solid rgba(0,184,148,0.4);
+}
+
+.cycle-ev {
+  display: inline-block;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--border);
+}
+
+.cycle-ev-trial { color: var(--green); background: rgba(0,184,148,0.18); }
+
+.cycle-caution {
+  color: var(--orange);
+  border-left: 2px solid var(--orange);
+  padding-left: 8px;
+}
+
+.cycle-src {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+  font-size: 11px;
+  margin-bottom: 0;
+}
+
 .cycle-block {
   padding: 14px 0;
   border-bottom: 1px solid var(--border);
@@ -2665,33 +2742,74 @@ const PEPTIDE_BLURBS = {
 // notes say so.
 const CYCLE_INFO = {
   tesamorelin: {
-    why: 'Tesamorelin is the best-evidenced of the three: it is FDA-approved as Egrifta for HIV-associated lipodystrophy and was studied at 2 mg daily <em>continuously</em>, not cycled. The pivotal trials ran 26 weeks with a 52-week extension. So the case for cycling is not receptor burnout -- it is that GH elevation lowers insulin sensitivity and raises IGF-1 over time, and a break lets both reset.',
-    watch: 'IGF-1 and fasting glucose / HbA1c. Visceral fat returns once you stop, so length here is a maintenance decision as much as a safety one.',
+    why: 'The only one of the three with real registration trials. FDA-approved as Egrifta at 2&nbsp;mg daily and studied <em>continuously</em>, not cycled: visceral fat fell about 11% at 26 weeks and about 18% at 52 weeks. Stopping reverses it &mdash; participants who came off after 26 weeks drifted back toward baseline over the following 26. So cycle length here is mostly a maintenance question, not a safety ceiling. The argument for breaks is that sustained GHRH signalling downregulates pituitary somatotroph response, and that GH elevation nudges insulin resistance upward.',
+    watch: 'IGF-1 is the one that matters &mdash; the FDA label says discontinue if it stays above +3 SDS. In trials IGF-1 roughly doubled while staying inside physiological range. Also fasting glucose / HbA1c, since GH lowers insulin sensitivity.',
+    sources: 'FDA Egrifta label; phase III VAT trials (26wk and 52wk extension)',
     options: [
-      { label: 'Conservative', onWeeks: 12, offWeeks: 4, note: 'Shortest run that still shows meaningful visceral fat change. Least metabolic exposure.' },
-      { label: 'Trial standard', onWeeks: 26, offWeeks: 4, note: 'Matches the main registration trials. Where the strongest efficacy data sits.' },
-      { label: 'Extended', onWeeks: 52, offWeeks: 8, note: 'Matches the 52-week extension. Studied, but the most GH exposure -- monitor labs.' },
+      { label: 'Short block', onWeeks: 12, offWeeks: 4, evidence: 'Convention', note: 'Clinic-common 3-month block. Long enough to see VAT change, shortest metabolic exposure. Below where the trial efficacy data sits.' },
+      { label: 'Trial length', onWeeks: 26, offWeeks: 8, evidence: 'Trial-derived', note: 'Matches the pivotal 26-week endpoint (~11% VAT). The best-supported duration.' },
+      { label: 'Full trial arm', onWeeks: 52, offWeeks: 8, evidence: 'Trial-derived', note: 'Matches the 52-week extension (~18% VAT) &mdash; the best results, and the most GH exposure. Lab monitoring expected.' },
     ],
   },
   ipamorelin: {
-    why: 'Ipamorelin is a ghrelin-receptor agonist, and that receptor downregulates with sustained stimulation. This is the one where cycling has a real mechanistic basis: run it continuously and the GH pulse you get for a given dose fades. Its selling point over GHRP-2/6 is selectivity -- it raises GH without meaningfully moving cortisol or prolactin. Human data is thin; most dosing convention is community-derived, not trial-derived.',
-    watch: 'Fading effect is the practical signal of desensitisation. IGF-1 if you can test it. Water retention and carpal-tunnel-type symptoms suggest too much GH.',
+    why: 'A selective ghrelin-receptor (GHS-R1a) agonist. Its advantage over GHRP-2/6 is clean selectivity &mdash; it raises GH without meaningfully moving cortisol or prolactin. Cycling rationale is weaker than commonly claimed: in vitro the receptor internalises within 20&ndash;60 minutes but recycles back to baseline surface density in about 6 hours, not weeks. The real signal is clinical &mdash; MK-677, another GHS-R agonist, ran into tachyphylaxis in development, and chronic dosing of ghrelin agonists loses effect on appetite. No trial has demonstrated desensitisation for ipamorelin specifically at these doses.',
+    watch: 'A fading response is your practical read on tolerance &mdash; there is no lab for it. Water retention, joint ache or carpal-tunnel symptoms mean too much GH. IGF-1 if you can test.',
+    sources: 'GHS-R1a desensitisation/endocytosis studies; MK-677 tachyphylaxis reports. Dosing conventions are community-derived.',
+    caution: 'Be sceptical of sources quoting exact figures like "30&ndash;45% efficacy loss after 12&ndash;16 weeks" or "21&ndash;28 days to restore receptor density" &mdash; those numbers trace to vendor marketing, not published trials.',
     options: [
-      { label: 'Conservative', onWeeks: 8, offWeeks: 4, note: 'Comfortably inside where desensitisation is typically reported. Most common starting point.' },
-      { label: 'Standard', onWeeks: 12, offWeeks: 4, note: 'The usual upper bound in practice. Watch for the effect tapering near the end.' },
-      { label: 'Extended', onWeeks: 16, offWeeks: 6, note: 'Past where most people report the pulse holding up. Needs a longer washout.' },
+      { label: 'First cycle', onWeeks: 8, offWeeks: 4, evidence: 'Convention', note: 'Recommended for a first run &mdash; you learn your response sooner and can adjust.' },
+      { label: 'Most cited', onWeeks: 12, offWeeks: 4, evidence: 'Convention', note: 'The most frequently cited pattern in clinical-practice writing. Reasonable default once you know you respond.' },
+      { label: 'Cautious long', onWeeks: 12, offWeeks: 8, evidence: 'Convention', note: 'Same run, double the washout. The conservative long-term choice given how thin the safety data is.' },
     ],
   },
   ghkcu: {
-    why: 'The constraint for injected GHK-Cu is copper, not the peptide. Each molecule carries a copper ion, and copper accumulates -- excess intake antagonises zinc absorption and, at sustained high levels, burdens the liver. That is why injectable cycles are the shortest of the three. Topical GHK-Cu is a different question: it delivers far less systemic copper and is commonly used continuously.',
-    watch: 'Zinc status is the first thing to go -- taste changes, immune niggles. Serum copper / ceruloplasmin if you are running longer or stacking other copper sources.',
+    why: 'The limiting factor is copper, not the peptide. Each molecule carries a copper ion, and injecting bypasses the gut regulation that normally caps copper absorption. Copper excess impairs zinc-dependent processes, which is why injectable cycles are the shortest here. Topical is a genuinely different risk profile &mdash; far less systemic copper, and commonly used continuously. Worth being blunt: no study has run injectable GHK-Cu long enough to establish a safe ceiling, so every number below is convention capping exposure in the absence of data.',
+    watch: 'Zinc status goes first &mdash; taste changes, more frequent minor illness. Serum copper and ceruloplasmin if running longer or stacking other copper sources. Contraindicated in Wilson\'s disease.',
+    sources: 'No long-duration human injectable trials exist. Protocols are practitioner convention.',
     options: [
-      { label: 'Conservative', onWeeks: 4, offWeeks: 4, note: 'Keeps cumulative copper load low. Sensible default for injectable use.' },
-      { label: 'Standard', onWeeks: 6, offWeeks: 4, note: 'Common for wound healing or a defined skin protocol.' },
-      { label: 'Extended', onWeeks: 8, offWeeks: 6, note: 'Upper end for injectable. Worth checking copper and zinc before and after.' },
+      { label: 'Conservative', onWeeks: 4, offWeeks: 4, evidence: 'Convention', note: 'Roughly the 30-days-on / 30-days-off rule. Lowest cumulative copper load.' },
+      { label: 'Standard', onWeeks: 8, offWeeks: 4, evidence: 'Convention', note: 'Common for a defined wound-healing or skin protocol. Worth checking copper and zinc.' },
+      { label: 'Extended', onWeeks: 12, offWeeks: 6, evidence: 'Convention', note: 'Upper end of what practitioners describe. Lab monitoring before and after is sensible.' },
     ],
   },
 };
+
+// Known synergistic pairings. GHRH analogs and ghrelin-receptor agonists hit
+// separate receptors, so combining them is genuinely additive-to-synergistic
+// rather than redundant.
+const STACKS = {
+  'tesamorelin+ipamorelin': {
+    members: ['tesamorelin', 'ipamorelin'],
+    name: 'Tesamorelin + Ipamorelin',
+    why: 'These work on two different switches in the same axis, which is why they pair well. Tesamorelin is a GHRH analog acting on the GHRH receptor; ipamorelin is a GHS-R1a agonist. Because they bind separate receptors, giving both produces a markedly larger GH pulse than either alone &mdash; a synergy repeatedly demonstrated in humans for the GHRH + GHRP classes since Bowers\' 1990 work in normal men. The mechanism is complementary: the GHRP arm suppresses somatostatin tone (the brake), while the GHRH arm supplies the accelerator.',
+    caveat: 'The synergy is established for the GHRH + GHRP <em>classes</em>, not for this specific blend in a dedicated human trial. Combining also means stacking GH exposure, so IGF-1 monitoring matters more here than on either alone.',
+    timing: 'Both are typically given together at night on an empty stomach, since GH release is largely nocturnal and food blunts the pulse.',
+  },
+};
+
+// Which known stacks the user has linked. Linked members share one cycle
+// window, since running a stack means starting and breaking together.
+function getLinkedStacks() {
+  try { return JSON.parse(localStorage.getItem('pt_stacks_' + getActiveProfileId())) || {}; }
+  catch { return {}; }
+}
+
+function saveLinkedStacks(obj) {
+  localStorage.setItem('pt_stacks_' + getActiveProfileId(), JSON.stringify(obj));
+}
+
+function activeStacks() {
+  const tracked = getTrackedPeptides();
+  return Object.entries(STACKS)
+    .filter(([, st]) => st.members.every(m => tracked.includes(m)))
+    .map(([id, st]) => ({ id, ...st }));
+}
+
+// The stack a peptide belongs to, only if that stack is linked.
+function linkedStackOf(pepKey) {
+  const linked = getLinkedStacks();
+  return activeStacks().find(st => linked[st.id] && st.members.includes(pepKey)) || null;
+}
 
 // Per-profile cycle overrides; falls back to the peptide's built-in default.
 function getCycleSettings() {
@@ -2701,6 +2819,16 @@ function getCycleSettings() {
 
 function saveCycleSettings(obj) {
   localStorage.setItem('pt_cycles_' + getActiveProfileId(), JSON.stringify(obj));
+}
+
+// Applies a window to one peptide, and to the rest of its stack when linked.
+function setCycleFor(pepKey, win) {
+  const s = getCycleSettings();
+  const stack = linkedStackOf(pepKey);
+  const targets = stack ? stack.members : [pepKey];
+  targets.forEach(k => { s[k] = { onWeeks: win.onWeeks, offWeeks: win.offWeeks }; });
+  saveCycleSettings(s);
+  return targets;
 }
 
 function cycleFor(pepKey) {
@@ -2775,9 +2903,22 @@ function renderCyclePlanner() {
   }
   if (card) card.style.display = '';
 
-  const settings = getCycleSettings();
+  const linked = getLinkedStacks();
+  const stackHtml = activeStacks().map(st => `
+    <div class="stack-card">
+      <div class="stack-head">
+        <span class="stack-name">${st.name}</span>
+        <label class="stack-toggle">
+          <input type="checkbox" data-stack="${st.id}" ${linked[st.id] ? 'checked' : ''}>
+          <span>Link cycles</span>
+        </label>
+      </div>
+      <p class="stack-why">${st.why}</p>
+      <p class="stack-timing"><strong>Timing:</strong> ${st.timing}</p>
+      <p class="stack-caveat">${st.caveat}</p>
+    </div>`).join('');
 
-  wrap.innerHTML = tracked.map(k => {
+  wrap.innerHTML = stackHtml + tracked.map(k => {
     const p = PEPTIDES[k];
     const info = CYCLE_INFO[k];
     const cur = cycleFor(k);
@@ -2785,20 +2926,24 @@ function renderCyclePlanner() {
 
     const presets = info.options.map(o => {
       const on = o.onWeeks === cur.onWeeks && o.offWeeks === cur.offWeeks;
+      const ev = o.evidence === 'Trial-derived' ? ' cycle-ev-trial' : '';
       return `<button type="button" class="cycle-preset${on ? ' selected' : ''}"
         data-pep="${k}" data-on="${o.onWeeks}" data-off="${o.offWeeks}">
         <span class="cycle-preset-label">${o.label}</span>
         <span class="cycle-preset-weeks">${o.onWeeks}w on / ${o.offWeeks}w off</span>
+        <span class="cycle-ev${ev}">${o.evidence}</span>
       </button>`;
     }).join('');
 
     const notes = info.options.map(o =>
-      `<li><strong>${o.label} (${o.onWeeks}/${o.offWeeks}):</strong> ${o.note}</li>`).join('');
+      `<li><strong>${o.label} (${o.onWeeks}/${o.offWeeks})</strong> <span class="cycle-ev${o.evidence === 'Trial-derived' ? ' cycle-ev-trial' : ''}">${o.evidence}</span><br>${o.note}</li>`).join('');
 
+    const st = linkedStackOf(k);
     return `<div class="cycle-block" data-pep="${k}">
       <div class="cycle-block-head">
         <span class="peptide-badge" style="background:${p.color}">${p.name}</span>
         ${cycleStatusHtml(k)}
+        ${st ? `<span class="cycle-linked">linked &middot; ${st.name}</span>` : ''}
       </div>
       <div class="cycle-presets">${presets}</div>
       <div class="cycle-custom">
@@ -2815,20 +2960,37 @@ function renderCyclePlanner() {
         <div class="cycle-info-body">
           <p>${info.why}</p>
           <p class="cycle-watch"><strong>Watch for:</strong> ${info.watch}</p>
+          ${info.caution ? `<p class="cycle-caution"><strong>Careful with sources:</strong> ${info.caution}</p>` : ''}
           <ul>${notes}</ul>
+          <p class="cycle-src"><strong>Basis:</strong> ${info.sources}</p>
         </div>
       </details>
     </div>`;
   }).join('');
 
-  wrap.querySelectorAll('.cycle-preset').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const s = getCycleSettings();
-      s[btn.dataset.pep] = { onWeeks: +btn.dataset.on, offWeeks: +btn.dataset.off };
-      saveCycleSettings(s);
+  wrap.querySelectorAll('.stack-toggle input').forEach(cb => {
+    cb.addEventListener('change', () => {
+      const all = getLinkedStacks();
+      all[cb.dataset.stack] = cb.checked;
+      saveLinkedStacks(all);
+      const st = activeStacks().find(x => x.id === cb.dataset.stack);
+      // Linking adopts the first member's window across the stack.
+      if (cb.checked && st) setCycleFor(st.members[0], cycleFor(st.members[0]));
       renderCyclePlanner();
       renderPeptideToggles();
-      showToast(`${PEPTIDES[btn.dataset.pep].name}: ${btn.dataset.on}w on / ${btn.dataset.off}w off`);
+      showToast(cb.checked ? 'Cycles linked' : 'Cycles unlinked');
+    });
+  });
+
+  wrap.querySelectorAll('.cycle-preset').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const targets = setCycleFor(btn.dataset.pep, { onWeeks: +btn.dataset.on, offWeeks: +btn.dataset.off });
+      renderCyclePlanner();
+      renderPeptideToggles();
+      const who = targets.length > 1
+        ? targets.map(k => PEPTIDES[k].short).join(' + ')
+        : PEPTIDES[btn.dataset.pep].name;
+      showToast(`${who}: ${btn.dataset.on}w on / ${btn.dataset.off}w off`);
     });
   });
 
@@ -2837,11 +2999,10 @@ function renderCyclePlanner() {
       const v = parseInt(inp.value, 10);
       if (isNaN(v) || v < 0) { renderCyclePlanner(); return; }
       const key = inp.dataset.pep;
-      const s = getCycleSettings();
-      const base = s[key] || cycleFor(key);
-      s[key] = { onWeeks: base.onWeeks, offWeeks: base.offWeeks, [inp.dataset.field]: v };
-      if (s[key].onWeeks < 1) s[key].onWeeks = 1;
-      saveCycleSettings(s);
+      const base = cycleFor(key);
+      const win = { onWeeks: base.onWeeks, offWeeks: base.offWeeks, [inp.dataset.field]: v };
+      if (win.onWeeks < 1) win.onWeeks = 1;
+      setCycleFor(key, win);
       renderCyclePlanner();
       renderPeptideToggles();
     });
@@ -4856,7 +5017,7 @@ window.addEventListener('resize', () => {
 
 // Initial render
 // Bumped whenever a build ships so the running version is visible in-app.
-const APP_VERSION = '2026.08.25-cycle-planner';
+const APP_VERSION = '2026.08.25-stacks-research';
 
 // Reloads bypassing the HTTP cache. GitHub Pages serves max-age=600 and iOS
 // standalone webapps hold on longer still, so the cache-buster is explicit.

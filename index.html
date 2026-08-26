@@ -309,6 +309,53 @@ nav::-webkit-scrollbar { display: none; width: 0; height: 0; }
   accent-color: var(--accent);
 }
 
+.cart-dose-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 8px 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.cart-dose-row label {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 0;
+  flex: 0 0 auto;
+}
+
+.cart-dose-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 7px 9px;
+  font-size: 14px;
+  font-weight: 600;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.cart-dose-unit {
+  font-size: 12px;
+  color: var(--text-muted);
+  flex: 0 0 auto;
+}
+
+.cart-dose-calc {
+  flex: 0 0 auto;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent);
+  min-width: 34px;
+  text-align: right;
+}
+
 .cart-stats {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -1978,8 +2025,9 @@ nav::-webkit-scrollbar { display: none; width: 0; height: 0; }
             <p style="font-size:11px;color:var(--text-muted);margin-top:4px;">Wasted priming the needle before each injection. 1u = 0.01 ml.</p>
           </div>
           <div class="form-group">
-            <label>Dose (mg)</label>
+            <label>Default Dose (mg)</label>
             <input type="number" id="cart-dose-mg" step="0.1" min="0.1" value="2">
+            <p style="font-size:11px;color:var(--text-muted);margin-top:4px;">Starting dose for new mg-based cartridges. Each cartridge can be changed on its own card.</p>
           </div>
         </div>
 
@@ -4190,6 +4238,23 @@ function getCartSettings() {
   } catch { return { primeUnits: 1, doseMg: 2 }; }
 }
 
+// Each cartridge carries its own injection amount, in that peptide's unit.
+// Cartridges created before per-cartridge dosing fall back to the global
+// default so their maths is unchanged.
+function cartDoseAmt(cart) {
+  const p = PEPTIDES[cart.peptide] || PEPTIDES[DEFAULT_PEPTIDE];
+  if (cart.doseAmt != null && !isNaN(cart.doseAmt)) return cart.doseAmt;
+  if (p.unit === 'mcg') return p.doses[0] || 0;
+  return getCartSettings().doseMg;
+}
+
+// Concentration is always stored mg/ml, so mcg-dosed peptides convert down.
+function cartDoseMg(cart) {
+  const p = PEPTIDES[cart.peptide] || PEPTIDES[DEFAULT_PEPTIDE];
+  const amt = cartDoseAmt(cart);
+  return p.unit === 'mcg' ? amt / 1000 : amt;
+}
+
 function saveCartSettings(s) {
   localStorage.setItem('pt_cartset_' + getActiveProfileId(), JSON.stringify(s));
 }
@@ -4246,10 +4311,13 @@ function renderCartridges() {
   listEl.innerHTML = carts.map(c => {
     const cp = PEPTIDES[c.peptide] || PEPTIDES[DEFAULT_PEPTIDE];
     const mgLeft = c.remaining * c.conc;
-    const doseMl = set.doseMg / c.conc;
+    const doseAmt = cartDoseAmt(c);
+    const doseMl = cartDoseMg(c) / c.conc;
     const perShot = doseMl + primeMl;
     const shotsLeft = perShot > 0 ? Math.floor(c.remaining / perShot) : 0;
     const pct = c.capacity > 0 ? (c.remaining / c.capacity) * 100 : 0;
+    const step = cp.unit === 'mcg' ? 25 : 0.5;
+    const tooBig = doseMl + primeMl > c.capacity;
     return `<div class="cart-card" data-id="${c.id}">
       <div class="cart-card-head">
         <span class="cart-card-title">
@@ -4260,18 +4328,26 @@ function renderCartridges() {
       <div class="cart-scale-wrap">${cartridgeSvg(c)}</div>
       <div class="cart-scale-note">Shown at actual size &middot; ${c.capacity} ml cartridge &middot; ${pct.toFixed(0)}% full</div>
       <input type="range" class="cart-slider" data-act="slider" min="0" max="${c.capacity}" step="0.01" value="${c.remaining}">
+      <div class="cart-dose-row">
+        <label>Injection</label>
+        <input type="number" class="cart-dose-input" data-act="dose" step="${step}" min="0" value="${doseAmt}">
+        <span class="cart-dose-unit">${cp.unit}</span>
+        <span class="cart-dose-calc">${(doseMl * UNITS_PER_ML).toFixed(0)}u</span>
+      </div>
       <div class="cart-stats">
         <div><div class="cart-stat-val">${c.remaining.toFixed(2)}</div><div class="cart-stat-lbl">ML Left</div></div>
         <div><div class="cart-stat-val">${mgLeft.toFixed(1)}</div><div class="cart-stat-lbl">MG Left</div></div>
         <div><div class="cart-stat-val">${shotsLeft}</div><div class="cart-stat-lbl">Shots Left</div></div>
       </div>
       <div class="cart-actions">
-        <button class="btn-primary" data-act="inject">Inject ${set.doseMg}mg</button>
+        <button class="btn-primary" data-act="inject">Inject ${doseAmt}${cp.unit}</button>
         <button class="btn-secondary" data-act="prime">Prime ${set.primeUnits}u</button>
         <button class="btn-secondary" data-act="refill">Refill</button>
       </div>
-      <div style="font-size:11px;color:var(--text-muted);margin-top:8px;">
-        ${c.conc} mg/ml &middot; dose ${(doseMl * UNITS_PER_ML).toFixed(0)}u + ${set.primeUnits}u prime = ${(perShot * UNITS_PER_ML).toFixed(0)}u per shot
+      <div style="font-size:11px;color:${tooBig ? 'var(--red)' : 'var(--text-muted)'};margin-top:8px;">
+        ${tooBig
+          ? `A ${doseAmt}${cp.unit} shot needs ${(perShot * UNITS_PER_ML).toFixed(0)}u, more than this cartridge holds`
+          : `${c.conc} mg/ml &middot; dose ${(doseMl * UNITS_PER_ML).toFixed(0)}u + ${set.primeUnits}u prime = ${(perShot * UNITS_PER_ML).toFixed(0)}u per shot`}
       </div>
     </div>`;
   }).join('');
@@ -4309,8 +4385,9 @@ document.getElementById('cart-list').addEventListener('click', e => {
   const carts = getCartridges();
   const c = carts.find(x => x.id === id);
   if (!c) return;
+  const cp = PEPTIDES[c.peptide] || PEPTIDES[DEFAULT_PEPTIDE];
   const primeMl = set.primeUnits / UNITS_PER_ML;
-  const need = act === 'inject' ? set.doseMg / c.conc + primeMl : primeMl;
+  const need = act === 'inject' ? cartDoseMg(c) / c.conc + primeMl : primeMl;
 
   if (c.remaining < need - 1e-9) {
     showToast('Not enough left in this cartridge', 'error');
@@ -4318,14 +4395,44 @@ document.getElementById('cart-list').addEventListener('click', e => {
   }
   updateCartridge(id, x => { x.remaining -= need; });
   showToast(act === 'inject'
-    ? `Injected ${set.doseMg}mg (+${set.primeUnits}u prime)`
+    ? `Injected ${cartDoseAmt(c)}${cp.unit} (+${set.primeUnits}u prime)`
     : `Primed ${set.primeUnits}u`);
 });
 
 document.getElementById('cart-list').addEventListener('input', e => {
   const slider = e.target.closest('[data-act="slider"]');
-  if (!slider) return;
-  updateCartridge(slider.closest('.cart-card').dataset.id, c => { c.remaining = parseFloat(slider.value); });
+  if (slider) {
+    updateCartridge(slider.closest('.cart-card').dataset.id, c => { c.remaining = parseFloat(slider.value); });
+    return;
+  }
+  // Re-rendering on every keystroke would steal focus, so only the derived
+  // readouts are patched in place while typing.
+  const doseInput = e.target.closest('[data-act="dose"]');
+  if (!doseInput) return;
+  const card = doseInput.closest('.cart-card');
+  const id = card.dataset.id;
+  const v = parseFloat(doseInput.value);
+  if (isNaN(v) || v < 0) return;
+
+  const carts = getCartridges();
+  const c = carts.find(x => x.id === id);
+  if (!c) return;
+  c.doseAmt = v;
+  saveCartridges(carts);
+
+  const cp = PEPTIDES[c.peptide] || PEPTIDES[DEFAULT_PEPTIDE];
+  const doseMl = cartDoseMg(c) / c.conc;
+  const perShot = doseMl + getCartSettings().primeUnits / UNITS_PER_ML;
+  card.querySelector('.cart-dose-calc').textContent = `${(doseMl * UNITS_PER_ML).toFixed(0)}u`;
+  card.querySelector('[data-act="inject"]').textContent = `Inject ${v}${cp.unit}`;
+  const shotsEl = card.querySelectorAll('.cart-stat-val')[2];
+  if (shotsEl) shotsEl.textContent = perShot > 0 ? Math.floor(c.remaining / perShot) : 0;
+});
+
+// Normalise once the field loses focus so a blank or stray value can't stick.
+document.getElementById('cart-list').addEventListener('change', e => {
+  if (!e.target.closest('[data-act="dose"]')) return;
+  renderCartridges();
 });
 
 setupCalcPresets('cart-new-capacity', 'newCartCapacity');
@@ -4343,11 +4450,14 @@ document.getElementById('cart-add-btn').addEventListener('click', () => {
   if (volume > capacity) { showToast('Fill volume exceeds capacity', 'error'); return; }
 
   const carts = getCartridges();
+  const newPep = document.getElementById('cart-new-peptide').value || DEFAULT_PEPTIDE;
+  const newP = PEPTIDES[newPep] || PEPTIDES[DEFAULT_PEPTIDE];
   carts.push({
     id: String(Date.now()),
     label: label || `Cartridge ${String.fromCharCode(65 + carts.length)}`,
     capacity, remaining: volume, conc,
-    peptide: document.getElementById('cart-new-peptide').value || DEFAULT_PEPTIDE,
+    peptide: newPep,
+    doseAmt: newP.unit === 'mcg' ? (newP.doses[0] || 0) : getCartSettings().doseMg,
   });
   saveCartridges(carts);
   document.getElementById('cart-new-label').value = '';

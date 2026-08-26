@@ -674,7 +674,7 @@ nav::-webkit-scrollbar { display: none; width: 0; height: 0; }
 
 .cycle-presets {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
   gap: 6px;
 }
 
@@ -1141,7 +1141,9 @@ nav::-webkit-scrollbar { display: none; width: 0; height: 0; }
 
 .pk-row {
   display: flex;
+  align-items: baseline;
   justify-content: space-between;
+  gap: 16px;
   padding: 10px 0;
   border-bottom: 1px solid var(--border);
 }
@@ -1151,13 +1153,39 @@ nav::-webkit-scrollbar { display: none; width: 0; height: 0; }
 }
 
 .pk-label {
+  flex: 0 0 auto;
   font-size: 14px;
   color: var(--text-muted);
 }
 
+.pk-sub {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(108, 92, 231, 0.18);
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+/* Long values -- GHK-Cu's range carries a topical note -- collide with the
+   label on narrow screens, so stack them there. */
+@media (max-width: 430px) {
+  .pk-row { flex-direction: column; align-items: stretch; gap: 3px; }
+  .pk-value { text-align: left !important; }
+}
+
 .pk-value {
+  flex: 1 1 auto;
+  min-width: 0;
+  text-align: right;
   font-size: 14px;
   font-weight: 600;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
 }
 
 .pk-disclaimer {
@@ -2449,7 +2477,7 @@ const PEPTIDES = {
     halfLife: 1.2, ka: 2.8, F: 0.8,
     doses: [1, 2], intervalHours: 24, cadence: 'Daily',
     vialPresets: [50, 100], affectsWeight: false,
-    cycle: { onWeeks: 4, offWeeks: 4 },
+    cycle: { onWeeks: 1, offWeeks: 0 },
     guidance: {
       range: '1-2 mg/day sub-Q (topical: 1-5% cream/serum, 1-2x daily)',
       cycle: 'Conservative: 4 weeks on, 4 weeks off',
@@ -2831,6 +2859,7 @@ const CYCLE_INFO = {
     watch: 'Zinc status goes first &mdash; taste changes, more frequent minor illness. Serum copper and ceruloplasmin if running longer or stacking other copper sources. Contraindicated in Wilson\'s disease.',
     sources: 'No long-duration human injectable trials exist. Protocols are practitioner convention.',
     options: [
+      { label: 'Continuous', onWeeks: 1, offWeeks: 0, evidence: 'Convention', note: 'Daily dosing with no scheduled break. Common for topical, where systemic copper load is minimal. On injectable this is the highest cumulative copper exposure of the three -- worth checking copper and zinc periodically.' },
       { label: 'Conservative', onWeeks: 4, offWeeks: 4, evidence: 'Convention', note: 'Roughly the 30-days-on / 30-days-off rule. Lowest cumulative copper load.' },
       { label: 'Standard', onWeeks: 8, offWeeks: 4, evidence: 'Convention', note: 'Common for a defined wound-healing or skin protocol. Worth checking copper and zinc.' },
       { label: 'Extended', onWeeks: 12, offWeeks: 6, evidence: 'Convention', note: 'Upper end of what practitioners describe. Lab monitoring before and after is sensible.' },
@@ -2895,6 +2924,14 @@ function setCycleFor(pepKey, win) {
   return targets;
 }
 
+// Reads a window as text. offWeeks 0 means no scheduled break.
+function cycleLabel(cyc) {
+  if (!cyc) return '';
+  return cyc.offWeeks === 0
+    ? `${cyc.onWeeks}w on &middot; continuous`
+    : `${cyc.onWeeks}w on / ${cyc.offWeeks}w off`;
+}
+
 function cycleFor(pepKey) {
   const p = PEPTIDES[pepKey];
   if (!p || !p.cycle) return null;
@@ -2918,14 +2955,21 @@ function cycleStatus(pepKey) {
   const times = doses.map(doseTimestamp);
   const last = times[times.length - 1];
 
-  // Walk back to the start of the unbroken run.
+  // Walk back to the start of the unbroken run. A zero-length off period
+  // means no gap can break the run, so it starts at the first dose.
   let runStart = times[0];
-  for (let i = times.length - 1; i > 0; i--) {
-    if (times[i] - times[i - 1] >= offMs) { runStart = times[i]; break; }
-    runStart = times[i - 1];
+  if (offMs > 0) {
+    for (let i = times.length - 1; i > 0; i--) {
+      if (times[i] - times[i - 1] >= offMs) { runStart = times[i]; break; }
+      runStart = times[i - 1];
+    }
   }
 
   const restingMs = now - last;
+  const continuous = cyc.offWeeks === 0;
+  if (continuous) {
+    return { state: 'continuous', weekNo: Math.max(1, Math.floor((now - runStart) / (7 * DAY)) + 1), cycle: cyc, runStart };
+  }
   if (restingMs >= offMs) {
     return { state: 'off', weeks: Math.floor(restingMs / (7 * DAY)), cycle: cyc, ready: true };
   }
@@ -2943,7 +2987,10 @@ function cycleStatusHtml(pepKey) {
   const cyc = cycleFor(pepKey);
   if (!cyc) return '';
   if (!st) {
-    return `<span class="cycle-chip cycle-idle">${cyc.onWeeks}w on / ${cyc.offWeeks}w off &middot; not started</span>`;
+    return `<span class="cycle-chip cycle-idle">${cycleLabel(cyc)} &middot; not started</span>`;
+  }
+  if (st.state === 'continuous') {
+    return `<span class="cycle-chip cycle-on">Week ${st.weekNo} &middot; continuous</span>`;
   }
   if (st.state === 'off') {
     return `<span class="cycle-chip cycle-rest">Resting ${st.weeks}w &middot; clear to restart</span>`;
@@ -2994,13 +3041,13 @@ function renderCyclePlanner() {
       return `<button type="button" class="cycle-preset${on ? ' selected' : ''}"
         data-pep="${k}" data-on="${o.onWeeks}" data-off="${o.offWeeks}">
         <span class="cycle-preset-label">${o.label}</span>
-        <span class="cycle-preset-weeks">${o.onWeeks}w on / ${o.offWeeks}w off</span>
+        <span class="cycle-preset-weeks">${o.offWeeks === 0 ? 'daily, no break' : `${o.onWeeks}w on / ${o.offWeeks}w off`}</span>
         <span class="cycle-ev${ev}">${o.evidence}</span>
       </button>`;
     }).join('');
 
     const notes = info.options.map(o =>
-      `<li><strong>${o.label} (${o.onWeeks}/${o.offWeeks})</strong> <span class="cycle-ev${o.evidence === 'Trial-derived' ? ' cycle-ev-trial' : ''}">${o.evidence}</span><br>${o.note}</li>`).join('');
+      `<li><strong>${o.label} (${o.offWeeks === 0 ? 'continuous' : o.onWeeks + '/' + o.offWeeks})</strong> <span class="cycle-ev${o.evidence === 'Trial-derived' ? ' cycle-ev-trial' : ''}">${o.evidence}</span><br>${o.note}</li>`).join('');
 
     const st = linkedStackOf(k);
     return `<div class="cycle-block" data-pep="${k}">
@@ -3996,10 +4043,14 @@ function renderPKPanel(pepKey) {
     : `${p.name} PK is modelled from published half-life ranges. Read the curve for timing and relative shape rather than as a true plasma concentration.`;
 
   const g = p.guidance || {};
+  const chosen = cycleFor(pepKey);
+  const cycleRow = chosen
+    ? `${cycleLabel(chosen)} <span class="pk-sub">your selection</span>`
+    : g.cycle;
   const gRows = [
     ['Typical Range', g.range],
     ['Titration', g.titration],
-    ['Cycle Length', g.cycle],
+    ['Cycle Length', cycleRow],
     ['Timing', g.timing],
     ['Notes', g.notes],
   ].filter(([, v]) => v);
@@ -5139,7 +5190,7 @@ window.addEventListener('resize', () => {
 
 // Initial render
 // Bumped whenever a build ships so the running version is visible in-app.
-const APP_VERSION = '2026.08.25-undo-expiry';
+const APP_VERSION = '2026.08.25-ghk-continuous';
 
 // Reloads bypassing the HTTP cache. GitHub Pages serves max-age=600 and iOS
 // standalone webapps hold on longer still, so the cache-buster is explicit.

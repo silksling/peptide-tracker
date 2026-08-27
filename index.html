@@ -1104,6 +1104,43 @@ nav::-webkit-scrollbar { display: none; width: 0; height: 0; }
   color: var(--text-muted);
 }
 
+.sched-start {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 0 14px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.sched-start input[type="date"] {
+  width: auto;
+  padding: 7px 10px;
+  font-size: 13px;
+  min-height: 38px;
+}
+
+.sched-start-src {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.sched-start-clear {
+  padding: 5px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 11px;
+  cursor: pointer;
+}
+
 .tier-sub {
   margin-top: 6px;
   font-size: 11px;
@@ -2350,6 +2387,7 @@ nav::-webkit-scrollbar { display: none; width: 0; height: 0; }
         <div class="timeline-section">
           <h2>Escalation Schedule</h2>
           <div class="peptide-tabs" id="schedule-peptide-tabs"></div>
+          <div class="sched-start" id="sched-start"></div>
           <div id="protocol-timeline"></div>
           <p class="tier-note" id="tier-note"></p>
         </div>
@@ -2517,7 +2555,7 @@ const PEPTIDES = {
     ],
     tierNote: 'Unlike retatrutide, stepping up does not reduce any risk -- it raises copper load linearly. Treat this as a ceiling plan, not a schedule to follow by default: hold at the lowest dose that works. 2.5-3 mg exists but is worth labs first.',
     vialPresets: [50, 100], affectsWeight: false,
-    cycle: { onWeeks: 1, offWeeks: 0 },
+    cycle: { onWeeks: 12, offWeeks: 4 },
     guidance: {
       range: '1-2 mg/day sub-Q (topical: 1-5% cream/serum, 1-2x daily)',
       cycle: 'Conservative: 4 weeks on, 4 weeks off',
@@ -2540,6 +2578,7 @@ const STORAGE_KEYS = {
   get doses() { return 'pt_doses_' + getActiveProfileId(); },
   get protocol() { return 'pt_protocol_' + getActiveProfileId(); },
   get peptides() { return 'pt_peptides_' + getActiveProfileId(); },
+  get pepStarts() { return 'pt_pepstarts_' + getActiveProfileId(); },
 };
 
 function renderProfilePicker() {
@@ -2895,6 +2934,7 @@ const CYCLE_INFO = {
       { label: 'Continuous', onWeeks: 1, offWeeks: 0, evidence: 'Convention', note: 'Daily dosing with no scheduled break. Common for topical, where systemic copper load is minimal. On injectable this is the highest cumulative copper exposure of the three -- worth checking copper and zinc periodically.' },
       { label: 'Conservative', onWeeks: 4, offWeeks: 4, evidence: 'Convention', note: 'Roughly the 30-days-on / 30-days-off rule. Lowest cumulative copper load.' },
       { label: 'Standard', onWeeks: 8, offWeeks: 4, evidence: 'Convention', note: 'Common for a defined wound-healing or skin protocol. Worth checking copper and zinc.' },
+      { label: 'Long', onWeeks: 12, offWeeks: 4, evidence: 'Convention', note: 'The most commonly cited injectable protocol. At 1-2 mg/day the copper load stays well under the dietary upper limit; the 4-week break is mainly about keeping responsiveness rather than clearing copper.' },
       { label: 'Extended', onWeeks: 12, offWeeks: 6, evidence: 'Convention', note: 'Upper end of what practitioners describe. Lab monitoring before and after is sensible.' },
     ],
   },
@@ -3324,6 +3364,49 @@ function renderDoseHistory() {
 // Render protocol timeline
 let schedulePeptide = null;
 
+function getPepStarts() {
+  return load(STORAGE_KEYS.pepStarts) || {};
+}
+
+function setPepStart(pepKey, dateStr) {
+  const all = getPepStarts();
+  if (dateStr) all[pepKey] = dateStr; else delete all[pepKey];
+  save(STORAGE_KEYS.pepStarts, all);
+}
+
+// Each peptide runs its own timeline. An explicit start wins; otherwise fall
+// back to the first dose actually logged for it, and only then to the overall
+// protocol start -- which is the retatrutide date and would otherwise make a
+// peptide started later look weeks further along than it is.
+function peptideStartDate(pepKey) {
+  const explicit = getPepStarts()[pepKey];
+  if (explicit) return { date: explicit, source: 'set by you' };
+  const doses = getDosesFor(pepKey);
+  if (doses.length) return { date: doses[0].date, source: 'first logged dose' };
+  const protocol = getProtocol();
+  if (protocol && protocol.startDate) return { date: protocol.startDate, source: 'protocol start' };
+  return null;
+}
+
+function renderScheduleStartControl(pepKey, info) {
+  const wrap = document.getElementById('sched-start');
+  if (!wrap) return;
+  const p = PEPTIDES[pepKey];
+  const val = info ? info.date : '';
+  wrap.innerHTML = `
+    <label for="sched-start-input">${p.name} start</label>
+    <input type="date" id="sched-start-input" value="${val}">
+    <span class="sched-start-src">${info ? info.source : 'not set'}</span>
+    ${getPepStarts()[pepKey] ? '<button type="button" class="sched-start-clear">Reset</button>' : ''}`;
+
+  wrap.querySelector('#sched-start-input').addEventListener('change', e => {
+    setPepStart(pepKey, e.target.value || null);
+    renderProtocol();
+  });
+  const clear = wrap.querySelector('.sched-start-clear');
+  if (clear) clear.addEventListener('click', () => { setPepStart(pepKey, null); renderProtocol(); });
+}
+
 function getSchedulePeptideKey() {
   const tracked = getTrackedPeptides();
   if (schedulePeptide && tracked.includes(schedulePeptide)) return schedulePeptide;
@@ -3372,14 +3455,20 @@ function renderProtocol() {
     return;
   }
 
-  const startDate = new Date(protocol.startDate + 'T12:00:00');
+  const schedKey = getSchedulePeptideKey();
+  const schedP = PEPTIDES[schedKey];
+
+  const startInfo = peptideStartDate(schedKey);
+  renderScheduleStartControl(schedKey, startInfo);
+  if (!startInfo) {
+    container.innerHTML = `<div class="empty-state">Log a ${schedP.name} dose or set a start date to see its timeline.</div>`;
+    return;
+  }
+
+  const startDate = new Date(startInfo.date + 'T12:00:00');
   const today = new Date();
   const daysSinceStart = Math.floor((today - startDate) / (1000 * 60 * 60 * 24));
   const currentWeek = Math.max(1, Math.floor(daysSinceStart / 7) + 1);
-
-  const schedKey = getSchedulePeptideKey();
-  const schedP = PEPTIDES[schedKey];
-  renderSchedulePeptideTabs();
 
   const tiers = schedP.tiers || [];
   const noteEl = document.getElementById('tier-note');
@@ -5326,7 +5415,7 @@ window.addEventListener('resize', () => {
 
 // Initial render
 // Bumped whenever a build ships so the running version is visible in-app.
-const APP_VERSION = '2026.08.25-escalation-schedules';
+const APP_VERSION = '2026.08.25-per-peptide-start';
 
 // Reloads bypassing the HTTP cache. GitHub Pages serves max-age=600 and iOS
 // standalone webapps hold on longer still, so the cache-buster is explicit.

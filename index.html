@@ -2028,10 +2028,8 @@ nav::-webkit-scrollbar { display: none; width: 0; height: 0; }
         </div>
         <div class="chart-container">
           <h2>Estimated Plasma Concentration</h2>
-          <div class="chart-controls">
-            <button class="levels-range active" data-range="30">30d</button>
-            <button class="levels-range" data-range="60">60d</button>
-            <button class="levels-range" data-range="all">All</button>
+          <div class="chart-controls" id="levels-ranges">
+            <!-- populated per peptide: a 45-minute peak is invisible on a 30-day axis -->
           </div>
           <canvas id="levels-chart"></canvas>
         </div>
@@ -2452,7 +2450,7 @@ const PEPTIDES = {
   },
   tesamorelin: {
     name: 'Tesamorelin', short: 'Tesa', unit: 'mg', color: '#00b894',
-    halfLife: 0.6, ka: 6, F: 0.04,
+    halfLife: 0.55, ka: 20, F: 0.04,
     doses: [1, 2], intervalHours: 24, cadence: 'Daily',
     vialPresets: [2, 5, 10], affectsWeight: false,
     cycle: { onWeeks: 12, offWeeks: 4 },
@@ -2465,7 +2463,7 @@ const PEPTIDES = {
   },
   ipamorelin: {
     name: 'Ipamorelin', short: 'Ipa', unit: 'mcg', color: '#fdcb6e',
-    halfLife: 2, ka: 2.2, F: 0.7,
+    halfLife: 2, ka: 8, F: 0.7,
     doses: [100, 200, 300], intervalHours: 24, cadence: 'Daily',
     vialPresets: [5, 10, 15], affectsWeight: false,
     cycle: { onWeeks: 8, offWeeks: 4 },
@@ -2477,7 +2475,7 @@ const PEPTIDES = {
   },
   ghkcu: {
     name: 'GHK-Cu', short: 'GHK', unit: 'mg', color: '#e17055',
-    halfLife: 1.2, ka: 2.8, F: 0.8,
+    halfLife: 4.5, ka: 4.5, F: 0.8,
     doses: [1, 2], intervalHours: 24, cadence: 'Daily',
     vialPresets: [50, 100], affectsWeight: false,
     cycle: { onWeeks: 1, offWeeks: 0 },
@@ -4020,6 +4018,43 @@ function renderLevelsPeptideTabs() {
   });
 }
 
+// A short-acting peptide needs an hours-to-days window; on a 30-day axis its
+// entire dose is well under a pixel wide.
+function rangeOptionsFor(pepKey) {
+  const p = PEPTIDES[pepKey];
+  return p.halfLife >= 24
+    ? [{ label: '30d', v: 30 }, { label: '60d', v: 60 }, { label: 'All', v: 'all' }]
+    : [{ label: '48h', v: 2 }, { label: '7d', v: 7 }, { label: '30d', v: 30 }, { label: 'All', v: 'all' }];
+}
+
+function defaultRangeFor(pepKey) {
+  return PEPTIDES[pepKey].halfLife >= 24 ? 30 : 2;
+}
+
+let lastRangePeptide = null;
+
+function renderLevelsRanges(pepKey) {
+  const wrap = document.getElementById('levels-ranges');
+  if (!wrap) return;
+  const opts = rangeOptionsFor(pepKey);
+  // 30d is offered for short peptides too, so a carried-over range stays
+  // technically valid while being the wrong lens. Reset on peptide change.
+  if (lastRangePeptide !== pepKey) {
+    levelsRange = defaultRangeFor(pepKey);
+    lastRangePeptide = pepKey;
+  }
+  if (!opts.some(o => o.v === levelsRange)) levelsRange = defaultRangeFor(pepKey);
+  wrap.innerHTML = opts.map(o =>
+    `<button class="levels-range${o.v === levelsRange ? ' active' : ''}" data-range="${o.v}">${o.label}</button>`).join('');
+  wrap.querySelectorAll('.levels-range').forEach(btn => {
+    btn.addEventListener('click', () => {
+      levelsRange = btn.dataset.range === 'all' ? 'all' : parseInt(btn.dataset.range);
+      renderLevelsRanges(pepKey);
+      drawLevelsChart();
+    });
+  });
+}
+
 function renderPKPanel(pepKey) {
   const p = PEPTIDES[pepKey];
   const ke = Math.LN2 / p.halfLife;
@@ -4068,11 +4103,31 @@ function renderPKPanel(pepKey) {
   document.getElementById('pk-note').innerHTML = modelNote + guidanceHtml;
 }
 
+// Peaks under an hour were being clamped to "1h" by a Math.max(1, ...), so a
+// 45-minute Tmax could never count down. Minutes below an hour, and days floor
+// rather than round.
+function formatHoursLeft(h) {
+  if (h <= 0) return 'Peaked';
+  if (h < 1) {
+    const mins = Math.max(1, Math.round(h * 60));
+    return `${mins}m`;
+  }
+  if (h < 24) {
+    const whole = Math.floor(h);
+    const mins = Math.round((h - whole) * 60);
+    return mins >= 1 ? `${whole}h ${mins}m` : `${whole}h`;
+  }
+  const days = Math.floor(h / 24);
+  const hrs = Math.round(h % 24);
+  return hrs >= 1 ? `${days}d ${hrs}h` : `${days}d`;
+}
+
 function renderLevels() {
   const pepKey = getLevelsPeptideKey();
   const p = PEPTIDES[pepKey];
   const doses = getDosesFor(pepKey);
   renderLevelsPeptideTabs();
+  renderLevelsRanges(pepKey);
   renderPKPanel(pepKey);
   document.querySelectorAll('.levels-unit').forEach(el => { el.textContent = p.unit; });
 
@@ -4109,16 +4164,9 @@ function renderLevels() {
   }
 
   const tmax = Math.log(p.ka / (Math.LN2 / p.halfLife)) / (p.ka - Math.LN2 / p.halfLife);
-  if (hoursSinceLastDose < tmax) {
-    const hrsLeft = Math.max(1, Math.round(tmax - hoursSinceLastDose));
-    if (hrsLeft > 24) {
-      document.getElementById('stat-time-to-peak').textContent = `${Math.round(hrsLeft / 24)}d ${hrsLeft % 24}h`;
-    } else {
-      document.getElementById('stat-time-to-peak').textContent = `${hrsLeft}h`;
-    }
-  } else {
-    document.getElementById('stat-time-to-peak').textContent = 'Peaked';
-  }
+  document.getElementById('stat-time-to-peak').textContent = hoursSinceLastDose < tmax
+    ? formatHoursLeft(tmax - hoursSinceLastDose)
+    : 'Peaked';
 
   const nextDoseTime = lastDoseTime + p.intervalHours * 3600000;
   const hoursUntilNext = (nextDoseTime - now) / (1000 * 60 * 60);
@@ -4166,24 +4214,34 @@ function drawLevelsChart(canvasId, rangeOverride, pepKeyOverride) {
 
   const now = Date.now();
   const firstDoseTime = doseTimestamp(doses[0]);
+  // Show enough forward time to watch the last dose decay, but no more.
+  const leadMs = Math.min(3 * 24 * 3600000, Math.max(6 * 3600000, peptide.halfLife * 5 * 3600000));
 
   const range = rangeOverride !== undefined ? rangeOverride : levelsRange;
   const earliest = firstDoseTime - 24 * 3600000;
   let chartStart, chartEnd;
   if (range === 'all') {
     chartStart = earliest;
-    chartEnd = now + 3 * 24 * 3600000;
+    chartEnd = now + leadMs;
   } else {
     chartStart = Math.max(earliest, now - range * 24 * 3600000);
-    chartEnd = now + 3 * 24 * 3600000;
+    chartEnd = now + leadMs;
   }
 
+  // A dose is spent after ~10 half-lives; keeping them only slows the sum.
+  const lookbackMs = Math.min(30 * 24 * 3600000, peptide.halfLife * 10 * 3600000);
   const relevantDoses = doses.filter(d => {
     const dt = doseTimestamp(d);
-    return dt <= chartEnd && (chartStart - dt) < 30 * 24 * 3600000;
+    return dt <= chartEnd && (chartStart - dt) < lookbackMs;
   });
 
-  const stepMs = Math.max(3600000, Math.round((chartEnd - chartStart) / 200));
+  // 200 samples across a 30-day window is 3.6h per point, which steps clean
+  // over a peptide that peaks in under an hour. Resolve the peak instead,
+  // capped so long-acting peptides do not pay for pointless resolution.
+  const HOUR = 3600000;
+  const span = chartEnd - chartStart;
+  const peakResolution = (peptide.halfLife * HOUR) / 8;
+  const stepMs = Math.max(span / 4000, Math.min(span / 200, peakResolution));
   const points = computePlasmaLevels(relevantDoses, chartStart, chartEnd, stepMs);
 
   if (!points.length) return;
@@ -4406,15 +4464,6 @@ function drawLevelsChart(canvasId, rangeOverride, pepKeyOverride) {
     ctx.setLineDash([]);
   }
 }
-
-document.querySelectorAll('.levels-range').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.levels-range').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    levelsRange = btn.dataset.range === 'all' ? 'all' : parseInt(btn.dataset.range);
-    drawLevelsChart();
-  });
-});
 
 // Reconstitution Calculator
 const calcState = { peptideAmt: 10, bacWater: 1, syringeUnits: 100, dose: 2, filterLoss: 0, filterBaseLoss: 0.28, filterRecovery: 1, filterMethod: 'reduce', useFilter: false, penCapacity: 3, maxInjection: 60, cartridgeCount: 1 };
@@ -5200,7 +5249,7 @@ window.addEventListener('resize', () => {
 
 // Initial render
 // Bumped whenever a build ships so the running version is visible in-app.
-const APP_VERSION = '2026.08.25-dose-tap-fix';
+const APP_VERSION = '2026.08.25-pk-tmax-fix';
 
 // Reloads bypassing the HTTP cache. GitHub Pages serves max-age=600 and iOS
 // standalone webapps hold on longer still, so the cache-buster is explicit.

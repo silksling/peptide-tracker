@@ -2519,10 +2519,10 @@ const PEPTIDES = {
     ],
     tierNote: 'Most protocols run a flat 2 mg. The opening week or two at 1 mg is a tolerance check, not a required ramp.',
     vialPresets: [2, 5, 10], affectsWeight: false,
-    cycle: { onWeeks: 12, offWeeks: 4 },
+    cycle: { onWeeks: 8, offWeeks: 4 },
     guidance: {
       range: '1-2 mg/day sub-Q',
-      cycle: 'Conservative: 12 weeks on, 4 weeks off',
+      cycle: 'Conservative: 8 weeks on, 4 weeks off',
       timing: 'Daily subcutaneous injection',
       notes: "FDA-approved dosing exists; don't mix formulation strengths",
     },
@@ -2956,8 +2956,15 @@ const STACKS = {
 // Which known stacks the user has linked. Linked members share one cycle
 // window, since running a stack means starting and breaking together.
 function getLinkedStacks() {
-  try { return JSON.parse(localStorage.getItem('pt_stacks_' + getActiveProfileId())) || {}; }
-  catch { return {}; }
+  let saved = {};
+  try { saved = JSON.parse(localStorage.getItem('pt_stacks_' + getActiveProfileId())) || {}; }
+  catch { saved = {}; }
+  // A stack is only worth surfacing because it is run together, so default to
+  // linked until the user says otherwise. Explicit false is respected.
+  Object.keys(STACKS).forEach(id => {
+    if (saved[id] === undefined) saved[id] = true;
+  });
+  return saved;
 }
 
 function saveLinkedStacks(obj) {
@@ -5415,7 +5422,7 @@ window.addEventListener('resize', () => {
 
 // Initial render
 // Bumped whenever a build ships so the running version is visible in-app.
-const APP_VERSION = '2026.08.25-per-peptide-start';
+const APP_VERSION = '2026.08.25-stack-synced';
 
 // Reloads bypassing the HTTP cache. GitHub Pages serves max-age=600 and iOS
 // standalone webapps hold on longer still, so the cache-buster is explicit.

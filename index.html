@@ -1104,6 +1104,20 @@ nav::-webkit-scrollbar { display: none; width: 0; height: 0; }
   color: var(--text-muted);
 }
 
+.tier-sub {
+  margin-top: 6px;
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+.tier-note {
+  margin-top: 12px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
 .tier-badge {
   display: inline-block;
   font-size: 11px;
@@ -2335,7 +2349,9 @@ nav::-webkit-scrollbar { display: none; width: 0; height: 0; }
         </div>
         <div class="timeline-section">
           <h2>Escalation Schedule</h2>
+          <div class="peptide-tabs" id="schedule-peptide-tabs"></div>
           <div id="protocol-timeline"></div>
+          <p class="tier-note" id="tier-note"></p>
         </div>
         <div class="data-section">
           <h2>Data Management</h2>
@@ -2438,6 +2454,13 @@ const PEPTIDES = {
     name: 'Retatrutide', short: 'Reta', unit: 'mg', color: '#6c5ce7',
     halfLife: 144, ka: 0.077, F: 0.95,
     doses: [1, 2, 4, 8, 12], intervalHours: 168, cadence: 'Weekly',
+    tiers: [
+      { name: 'Escalation 1', dose: 2, weeks: [1, 4] },
+      { name: 'Escalation 2', dose: 4, weeks: [5, 8] },
+      { name: 'Escalation 3', dose: 8, weeks: [9, 12] },
+      { name: 'Maintenance', dose: 12, weeks: [13, 48] },
+    ],
+    tierNote: 'Escalation here is a tolerability on-ramp -- each step is expected, and side effects typically ease as you adapt.',
     vialPresets: [5, 10, 15, 20, 30], affectsWeight: true,
     cycle: null,
     guidance: {
@@ -2452,6 +2475,11 @@ const PEPTIDES = {
     name: 'Tesamorelin', short: 'Tesa', unit: 'mg', color: '#00b894',
     halfLife: 0.55, ka: 20, F: 0.04,
     doses: [1, 2], intervalHours: 24, cadence: 'Daily',
+    tiers: [
+      { name: 'Tolerance check', dose: 1, weeks: [1, 2] },
+      { name: 'Standard dose', dose: 2, weeks: [3, 26] },
+    ],
+    tierNote: 'Most protocols run a flat 2 mg. The opening week or two at 1 mg is a tolerance check, not a required ramp.',
     vialPresets: [2, 5, 10], affectsWeight: false,
     cycle: { onWeeks: 12, offWeeks: 4 },
     guidance: {
@@ -2465,6 +2493,11 @@ const PEPTIDES = {
     name: 'Ipamorelin', short: 'Ipa', unit: 'mcg', color: '#fdcb6e',
     halfLife: 2, ka: 8, F: 0.7,
     doses: [100, 200, 300], intervalHours: 24, cadence: 'Daily',
+    tiers: [
+      { name: 'Starting dose', dose: 200, weeks: [1, 4] },
+      { name: 'Optional step', dose: 300, weeks: [5, 26] },
+    ],
+    tierNote: 'Commonly run flat at 200-300 mcg. Step up only if the lower dose plateaus.',
     vialPresets: [5, 10, 15], affectsWeight: false,
     cycle: { onWeeks: 8, offWeeks: 4 },
     guidance: {
@@ -2476,7 +2509,13 @@ const PEPTIDES = {
   ghkcu: {
     name: 'GHK-Cu', short: 'GHK', unit: 'mg', color: '#e17055',
     halfLife: 4.5, ka: 4.5, F: 0.8,
-    doses: [1, 2], intervalHours: 24, cadence: 'Daily',
+    doses: [1, 1.5, 2, 2.5, 3], intervalHours: 24, cadence: 'Daily',
+    tiers: [
+      { name: 'Starting dose', dose: 1, weeks: [1, 4], note: 'Hold. Effects take 4-6 weeks to read, so this is the assessment window.' },
+      { name: 'Step 1', dose: 1.5, weeks: [5, 8], note: 'Only if week-4 progress has genuinely plateaued.' },
+      { name: 'Step 2', dose: 2, weeks: [9, 12], note: 'Common effective dose. Many stop here.' },
+    ],
+    tierNote: 'Unlike retatrutide, stepping up does not reduce any risk -- it raises copper load linearly. Treat this as a ceiling plan, not a schedule to follow by default: hold at the lowest dose that works. 2.5-3 mg exists but is worth labs first.',
     vialPresets: [50, 100], affectsWeight: false,
     cycle: { onWeeks: 1, offWeeks: 0 },
     guidance: {
@@ -2566,13 +2605,6 @@ if (migratedId) {
 } else {
   renderProfilePicker();
 }
-
-const PROTOCOL_TIERS = [
-  { name: 'Escalation 1', dose: 2, weeks: [1, 4], duration: 4 },
-  { name: 'Escalation 2', dose: 4, weeks: [5, 8], duration: 4 },
-  { name: 'Escalation 3', dose: 8, weeks: [9, 12], duration: 4 },
-  { name: 'Maintenance', dose: 12, weeks: [13, 48], duration: 36 },
-];
 
 function load(key) {
   try {
@@ -3290,6 +3322,33 @@ function renderDoseHistory() {
 }
 
 // Render protocol timeline
+let schedulePeptide = null;
+
+function getSchedulePeptideKey() {
+  const tracked = getTrackedPeptides();
+  if (schedulePeptide && tracked.includes(schedulePeptide)) return schedulePeptide;
+  return getPrimaryPeptideKey();
+}
+
+function renderSchedulePeptideTabs() {
+  const wrap = document.getElementById('schedule-peptide-tabs');
+  if (!wrap) return;
+  const tracked = getTrackedPeptides();
+  const active = getSchedulePeptideKey();
+  if (tracked.length < 2) { wrap.innerHTML = ''; return; }
+  wrap.innerHTML = tracked.map(k => {
+    const p = PEPTIDES[k];
+    return `<button class="peptide-tab${k === active ? ' active' : ''}" data-peptide="${k}"
+      style="${k === active ? `background:${p.color};border-color:${p.color};color:#fff;` : ''}">${p.name}</button>`;
+  }).join('');
+  wrap.querySelectorAll('.peptide-tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      schedulePeptide = btn.dataset.peptide;
+      renderProtocol();
+    });
+  });
+}
+
 function renderProtocol() {
   const protocol = getProtocol();
   const container = document.getElementById('protocol-timeline');
@@ -3304,6 +3363,10 @@ function renderProtocol() {
       .filter(Boolean).join(' ');
   }
 
+  renderSchedulePeptideTabs();
+  const noteEarly = document.getElementById('tier-note');
+  if (noteEarly) noteEarly.textContent = (PEPTIDES[getSchedulePeptideKey()].tierNote) || '';
+
   if (!protocol) {
     container.innerHTML = '<div class="empty-state">Set your protocol start date above to see the escalation timeline.</div>';
     return;
@@ -3314,7 +3377,20 @@ function renderProtocol() {
   const daysSinceStart = Math.floor((today - startDate) / (1000 * 60 * 60 * 24));
   const currentWeek = Math.max(1, Math.floor(daysSinceStart / 7) + 1);
 
-  container.innerHTML = PROTOCOL_TIERS.map(tier => {
+  const schedKey = getSchedulePeptideKey();
+  const schedP = PEPTIDES[schedKey];
+  renderSchedulePeptideTabs();
+
+  const tiers = schedP.tiers || [];
+  const noteEl = document.getElementById('tier-note');
+  if (noteEl) noteEl.textContent = schedP.tierNote || '';
+
+  if (!tiers.length) {
+    container.innerHTML = '<div class="empty-state">No escalation schedule for this peptide.</div>';
+    return;
+  }
+
+  container.innerHTML = tiers.map(tier => {
     const tierStartDate = new Date(startDate);
     tierStartDate.setDate(tierStartDate.getDate() + (tier.weeks[0] - 1) * 7);
     const tierEndDate = new Date(startDate);
@@ -3337,9 +3413,10 @@ function renderProtocol() {
       <div class="timeline-tier ${status}">
         <div class="tier-header">
           <span class="tier-name">${tier.name} (Weeks ${tier.weeks[0]}-${tier.weeks[1]})${badge}</span>
-          <span class="tier-dose">${tier.dose} mg</span>
+          <span class="tier-dose">${tier.dose} ${schedP.unit}</span>
         </div>
         <div class="tier-dates">${startStr} - ${endStr}</div>
+        ${tier.note ? `<div class="tier-sub">${tier.note}</div>` : ''}
       </div>`;
   }).join('');
 }
@@ -5249,7 +5326,7 @@ window.addEventListener('resize', () => {
 
 // Initial render
 // Bumped whenever a build ships so the running version is visible in-app.
-const APP_VERSION = '2026.08.25-pk-tmax-fix';
+const APP_VERSION = '2026.08.25-escalation-schedules';
 
 // Reloads bypassing the HTTP cache. GitHub Pages serves max-age=600 and iOS
 // standalone webapps hold on longer still, so the cache-buster is explicit.

@@ -2549,11 +2549,10 @@ const PEPTIDES = {
     halfLife: 4.5, ka: 4.5, F: 0.8,
     doses: [1, 1.5, 2, 2.5, 3], intervalHours: 24, cadence: 'Daily',
     tiers: [
-      { name: 'Starting dose', dose: 1, weeks: [1, 4], note: 'Hold. Effects take 4-6 weeks to read, so this is the assessment window.' },
-      { name: 'Step 1', dose: 1.5, weeks: [5, 8], note: 'Only if week-4 progress has genuinely plateaued.' },
-      { name: 'Step 2', dose: 2, weeks: [9, 12], note: 'Common effective dose. Many stop here.' },
+      { name: 'Tolerance check', dose: 1, weeks: [1, 1], note: 'One week at 1 mg to confirm you tolerate it.' },
+      { name: 'Working dose', dose: 2, weeks: [2, 12], note: 'The common effective dose. Hold here for the rest of the block -- there is no benefit to climbing further unless this plateaus.' },
     ],
-    tierNote: 'Unlike retatrutide, stepping up does not reduce any risk -- it raises copper load linearly. Treat this as a ceiling plan, not a schedule to follow by default: hold at the lowest dose that works. 2.5-3 mg exists but is worth labs first.',
+    tierNote: 'Stepping up does not reduce any risk here -- it raises copper load linearly, so 2 mg is a destination rather than a waypoint. 2.5-3 mg exists but buys little for most people and is worth copper/ceruloplasmin/zinc labs first.',
     vialPresets: [50, 100], affectsWeight: false,
     cycle: { onWeeks: 12, offWeeks: 4 },
     guidance: {
@@ -4141,6 +4140,9 @@ function formatDoseAmount(amount, pepKey) {
 
 function pkAmount(doseAmount, hoursAfterDose, pepKey) {
   if (hoursAfterDose < 0) return 0;
+  if (!PEPTIDES[pepKey]) {
+    console.warn('pkAmount called without a valid peptide key:', pepKey);
+  }
   const p = PEPTIDES[pepKey] || PEPTIDES[DEFAULT_PEPTIDE];
   const ke = Math.LN2 / p.halfLife;
   const { ka, F } = p;
@@ -4510,7 +4512,7 @@ function drawLevelsChart(canvasId, rangeOverride, pepKeyOverride) {
     let nowLevel = 0;
     for (const dose of relevantDoses) {
       const hoursAfter = (now - doseTimestamp(dose)) / (1000 * 60 * 60);
-      nowLevel += pkAmount(dose.amount, hoursAfter);
+      nowLevel += pkAmount(dose.amount, hoursAfter, peptideKeyOf(dose));
     }
     const nowY = yScale(nowLevel);
 
@@ -5422,7 +5424,7 @@ window.addEventListener('resize', () => {
 
 // Initial render
 // Bumped whenever a build ships so the running version is visible in-app.
-const APP_VERSION = '2026.08.25-stack-synced';
+const APP_VERSION = '2026.08.25-level-callout-fix';
 
 // Reloads bypassing the HTTP cache. GitHub Pages serves max-age=600 and iOS
 // standalone webapps hold on longer still, so the cache-buster is explicit.

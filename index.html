@@ -2341,6 +2341,16 @@ nav::-webkit-scrollbar { display: none; width: 0; height: 0; }
             <input type="number" id="cart-dose-mg" step="0.1" min="0.1" value="2">
             <p style="font-size:11px;color:var(--text-muted);margin-top:4px;">Starting dose for new mg-based cartridges. Each cartridge can be changed on its own card.</p>
           </div>
+          <div class="form-group">
+            <label style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+              <span>Auto-deduct on logged dose</span>
+              <label class="toggle-switch" style="margin:0;">
+                <input type="checkbox" id="cart-auto-deduct" checked>
+                <span class="toggle-slider"></span>
+              </label>
+            </label>
+            <p style="font-size:11px;color:var(--text-muted);margin-top:4px;">Logging a dose draws it from the oldest cartridge of that peptide, priming included. Deleting the dose puts the volume back.</p>
+          </div>
         </div>
 
         <div id="cart-list"></div>
@@ -2875,8 +2885,18 @@ document.getElementById('dose-form').addEventListener('submit', e => {
 
   const sideEffects = [...document.querySelectorAll('.side-effect-chip.selected')].map(c => c.dataset.effect);
 
+  const entry = { date, time, amount, peptide, site, notes, sideEffects, id: Date.now().toString() };
+
+  // Draw it from a cartridge before saving, so the dose can record which one
+  // it came from and how much it took.
+  const drawn = applyDoseToCartridge(entry);
+  if (drawn && !drawn.short) {
+    entry.cartridgeId = drawn.cart.id;
+    entry.mlUsed = drawn.need;
+  }
+
   const doses = getDoses();
-  doses.push({ date, time, amount, peptide, site, notes, sideEffects, id: Date.now().toString() });
+  doses.push(entry);
   doses.sort((a, b) => `${a.date}T${a.time || '09:00'}`.localeCompare(`${b.date}T${b.time || '09:00'}`));
   save(STORAGE_KEYS.doses, doses);
 
@@ -2885,10 +2905,20 @@ document.getElementById('dose-form').addEventListener('submit', e => {
   document.getElementById('dose-site').value = '';
   document.getElementById('dose-notes').value = '';
   document.querySelectorAll('.side-effect-chip.selected').forEach(c => c.classList.remove('selected'));
-  showToast(`${PEPTIDES[peptide].name} logged: ${formatDoseAmount(amount, peptide)}`);
+
+  const base = `${PEPTIDES[peptide].name} logged: ${formatDoseAmount(amount, peptide)}`;
+  if (drawn && drawn.short) {
+    showToast(`${base} - not enough in ${drawn.cart.label}, deduct manually`, 'error');
+  } else if (drawn) {
+    showToast(`${base} - ${(drawn.need * UNITS_PER_ML).toFixed(0)}u from ${drawn.cart.label}`);
+  } else {
+    showToast(base);
+  }
+
   renderDoseHistory();
   updateSiteSuggestion();
   renderDashboard();
+  renderCartridges();
 });
 
 const PEPTIDE_BLURBS = {
@@ -3359,10 +3389,19 @@ function renderDoseHistory() {
     btn.addEventListener('click', async () => {
       const ok = await showConfirm('Delete this dose entry?');
       if (!ok) return;
+      const removed = getDoses().find(d => d.id === btn.dataset.id);
       const doses = getDoses().filter(d => d.id !== btn.dataset.id);
       save(STORAGE_KEYS.doses, doses);
+      // Hand back whatever this dose drew, so deleting a mistake does not
+      // leave the cartridge short.
+      revertDoseFromCartridge(removed);
       renderDoseHistory();
-      showToast('Entry deleted');
+      renderCartridges();
+      renderDashboard();
+      const back = removed && removed.mlUsed
+        ? ` - ${(removed.mlUsed * UNITS_PER_ML).toFixed(0)}u returned`
+        : '';
+      showToast('Entry deleted' + back);
     });
   });
 }
@@ -5115,6 +5154,55 @@ function saveCartSettings(s) {
   localStorage.setItem('pt_cartset_' + getActiveProfileId(), JSON.stringify(s));
 }
 
+// Converts a logged dose into the volume it draws, including the priming
+// waste, so a logged dose and a cartridge Inject cost the same.
+function doseVolumeMl(pepKey, amount, conc) {
+  const p = PEPTIDES[pepKey] || PEPTIDES[DEFAULT_PEPTIDE];
+  const mg = p.unit === 'mcg' ? amount / 1000 : amount;
+  const primeMl = getCartSettings().primeUnits / UNITS_PER_ML;
+  return conc > 0 ? mg / conc + primeMl : 0;
+}
+
+// Oldest cartridge of that peptide holding enough. Oldest-first drains
+// existing stock before it hits its expiry rather than opening a fresh one.
+function pickCartridgeForDose(pepKey, amount) {
+  const carts = getCartridges().filter(c => (c.peptide || DEFAULT_PEPTIDE) === pepKey && c.conc > 0);
+  if (!carts.length) return null;
+  const withNeed = carts.map(c => ({ cart: c, need: doseVolumeMl(pepKey, amount, c.conc) }));
+  const enough = withNeed.filter(x => x.cart.remaining >= x.need - 1e-9);
+  if (!enough.length) return { short: true, best: withNeed.sort((a, b) => b.cart.remaining - a.cart.remaining)[0] };
+  enough.sort((a, b) => (a.cart.created || 0) - (b.cart.created || 0));
+  return enough[0];
+}
+
+// Draws a logged dose from a cartridge. Records which cartridge and how much
+// on the dose itself, so deleting the dose can hand the volume back.
+function applyDoseToCartridge(dose) {
+  if (getCartSettings().autoDeduct === false) return null;
+  const pepKey = peptideKeyOf(dose);
+  const pick = pickCartridgeForDose(pepKey, dose.amount);
+  if (!pick) return null;
+  if (pick.short) return { short: true, cart: pick.best.cart, need: pick.best.need };
+
+  const carts = getCartridges();
+  const target = carts.find(c => c.id === pick.cart.id);
+  if (!target) return null;
+  target.remaining = Math.max(0, target.remaining - pick.need);
+  saveCartridges(carts);
+  return { cart: target, need: pick.need };
+}
+
+// Undoes the deduction a dose made, using the volume recorded at log time so
+// a later concentration or priming change cannot skew the refund.
+function revertDoseFromCartridge(dose) {
+  if (!dose || !dose.cartridgeId || !dose.mlUsed) return;
+  const carts = getCartridges();
+  const target = carts.find(c => c.id === dose.cartridgeId);
+  if (!target) return;
+  target.remaining = Math.min(target.capacity, target.remaining + dose.mlUsed);
+  saveCartridges(carts);
+}
+
 // Draws a to-scale cartridge. Real 3ml pen cartridges are ~64mm long,
 // so the SVG uses 1 unit = 1mm and CSS sizes it in physical mm.
 function cartridgeSvg(cart) {
@@ -5359,11 +5447,19 @@ document.getElementById('cart-add-btn').addEventListener('click', () => {
   });
 });
 
+document.getElementById('cart-auto-deduct').addEventListener('change', e => {
+  const set = getCartSettings();
+  set.autoDeduct = e.target.checked;
+  saveCartSettings(set);
+  showToast(e.target.checked ? 'Auto-deduct on' : 'Auto-deduct off');
+});
+
 function loadCartSettingsForm() {
   const set = getCartSettings();
   document.getElementById('cart-prime-units').value = set.primeUnits;
   document.getElementById('cart-dose-mg').value = set.doseMg;
   document.getElementById('cart-shelf-days').value = cartShelfDays();
+  document.getElementById('cart-auto-deduct').checked = set.autoDeduct !== false;
 }
 
 loadCartSettingsForm();
@@ -5424,7 +5520,7 @@ window.addEventListener('resize', () => {
 
 // Initial render
 // Bumped whenever a build ships so the running version is visible in-app.
-const APP_VERSION = '2026.08.25-level-callout-fix';
+const APP_VERSION = '2026.08.25-auto-deduct';
 
 // Reloads bypassing the HTTP cache. GitHub Pages serves max-age=600 and iOS
 // standalone webapps hold on longer still, so the cache-buster is explicit.

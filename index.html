@@ -2529,10 +2529,10 @@ const PEPTIDES = {
     ],
     tierNote: 'Most protocols run a flat 2 mg. The opening week or two at 1 mg is a tolerance check, not a required ramp.',
     vialPresets: [2, 5, 10], affectsWeight: false,
-    cycle: { onWeeks: 8, offWeeks: 4 },
+    cycle: { onWeeks: 12, offWeeks: 4 },
     guidance: {
       range: '1-2 mg/day sub-Q',
-      cycle: 'Conservative: 8 weeks on, 4 weeks off',
+      cycle: 'Clinic-common: 12 weeks on, 4 weeks off',
       timing: 'Daily subcutaneous injection',
       notes: "FDA-approved dosing exists; don't mix formulation strengths",
     },
@@ -2706,8 +2706,16 @@ function doseTimestamp(dose) {
   return new Date(`${dose.date}T${dose.time || '09:00'}:00`).getTime();
 }
 
+// toISOString() converts to UTC first, so west of Greenwich every evening
+// past the UTC offset reports tomorrow's date. Calendar dates must be read
+// from local components instead.
+function localDateStr(d = new Date()) {
+  const pad = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
 function todayStr() {
-  return new Date().toISOString().split('T')[0];
+  return localDateStr();
 }
 
 let toastTimer = null;
@@ -2988,11 +2996,6 @@ function getLinkedStacks() {
   let saved = {};
   try { saved = JSON.parse(localStorage.getItem('pt_stacks_' + getActiveProfileId())) || {}; }
   catch { saved = {}; }
-  // A stack is only worth surfacing because it is run together, so default to
-  // linked until the user says otherwise. Explicit false is respected.
-  Object.keys(STACKS).forEach(id => {
-    if (saved[id] === undefined) saved[id] = true;
-  });
   return saved;
 }
 
@@ -3540,8 +3543,8 @@ function renderProtocol() {
       badge = '<span class="tier-badge current">Current</span>';
     }
 
-    const startStr = formatDateShort(tierStartDate.toISOString().split('T')[0]);
-    const endStr = formatDateShort(tierEndDate.toISOString().split('T')[0]);
+    const startStr = formatDateShort(localDateStr(tierStartDate));
+    const endStr = formatDateShort(localDateStr(tierEndDate));
 
     return `
       <div class="timeline-tier ${status}">
@@ -3565,7 +3568,7 @@ function visibleWeights() {
   if (currentRange !== 'all') {
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() - currentRange);
-    const cs = cutoff.toISOString().split('T')[0];
+    const cs = localDateStr(cutoff);
     ws = ws.filter(w => w.date >= cs);
   }
   return ws;
@@ -3664,7 +3667,7 @@ function drawChart() {
   if (currentRange !== 'all') {
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() - currentRange);
-    const cutoffStr = cutoff.toISOString().split('T')[0];
+    const cutoffStr = localDateStr(cutoff);
     weights = weights.filter(w => w.date >= cutoffStr);
   }
 
@@ -4502,7 +4505,7 @@ function drawLevelsChart(canvasId, rangeOverride, pepKeyOverride) {
   for (let i = 0; i < labelCount; i++) {
     const t = chartStart + (i / (labelCount - 1)) * (chartEnd - chartStart);
     const d = new Date(t);
-    ctx.fillText(formatDateShort(d.toISOString().split('T')[0]), xScale(t), height - 8);
+    ctx.fillText(formatDateShort(localDateStr(d)), xScale(t), height - 8);
   }
 
   // Dose markers with labels
@@ -5520,7 +5523,7 @@ window.addEventListener('resize', () => {
 
 // Initial render
 // Bumped whenever a build ships so the running version is visible in-app.
-const APP_VERSION = '2026.08.25-auto-deduct';
+const APP_VERSION = '2026.09.07-local-dates';
 
 // Reloads bypassing the HTTP cache. GitHub Pages serves max-age=600 and iOS
 // standalone webapps hold on longer still, so the cache-buster is explicit.

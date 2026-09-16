@@ -2387,35 +2387,6 @@ nav::-webkit-scrollbar { display: none; width: 0; height: 0; }
       <!-- Cartridges View -->
       <section id="view-cartridges" class="view">
         <div class="form-card">
-          <h2>Add Cartridge</h2>
-          <div class="form-group">
-            <label>Label</label>
-            <input type="text" id="cart-new-label" placeholder="e.g. Cartridge A">
-          </div>
-          <div class="form-group">
-            <label>Capacity (ml)</label>
-            <div class="calc-preset-grid" id="cart-new-capacity" style="grid-template-columns: repeat(3, 1fr);">
-              <button class="calc-preset" data-val="1.5">1.5 ml</button>
-              <button class="calc-preset selected" data-val="3">3.0 ml</button>
-              <button class="calc-preset" data-val="5">5.0 ml</button>
-            </div>
-          </div>
-          <div class="form-group">
-            <label>Filled Volume (ml)</label>
-            <input type="number" id="cart-new-volume" step="0.05" min="0.05" placeholder="e.g. 3">
-          </div>
-          <div class="form-group">
-            <label>Concentration (mg/ml)</label>
-            <input type="number" id="cart-new-conc" step="0.1" min="0.1" placeholder="e.g. 10">
-          </div>
-          <div class="form-group">
-            <label for="cart-new-peptide">Peptide</label>
-            <select id="cart-new-peptide"></select>
-          </div>
-          <button class="btn-primary" id="cart-add-btn" style="width:100%;">Add Cartridge</button>
-        </div>
-
-        <div class="form-card" style="margin-top:16px;">
           <h2>Injection Settings</h2>
           <div class="form-group">
             <label>Priming Dose (units)</label>
@@ -2989,14 +2960,6 @@ function populatePeptideSelect() {
     `<option value="${k}">${PEPTIDES[k].name}</option>`).join('');
   sel.value = tracked.includes(prev) ? prev : tracked[0];
   populateDoseOptions();
-
-  const cartSel = document.getElementById('cart-new-peptide');
-  if (cartSel) {
-    const cprev = cartSel.value;
-    cartSel.innerHTML = tracked.map(k =>
-      `<option value="${k}">${PEPTIDES[k].name}</option>`).join('');
-    cartSel.value = tracked.includes(cprev) ? cprev : tracked[0];
-  }
 }
 
 function populateDoseOptions() {
@@ -5494,7 +5457,7 @@ function renderCartridges() {
   const primeMl = set.primeUnits / UNITS_PER_ML;
 
   if (!carts.length) {
-    listEl.innerHTML = '<div class="cart-empty">No cartridges yet. Add one above, or send one over from the Calc tab.</div>';
+    listEl.innerHTML = '<div class="cart-empty">No cartridges yet. Work out a mix on the Calc tab and send it over &mdash; that way its filter and reconstitution settings come with it.</div>';
     return;
   }
 
@@ -5727,38 +5690,6 @@ document.getElementById('cart-list').addEventListener('change', e => {
   renderCartridges();
 });
 
-setupCalcPresets('cart-new-capacity', 'newCartCapacity');
-
-document.getElementById('cart-add-btn').addEventListener('click', () => {
-  const capBtn = document.querySelector('#cart-new-capacity .calc-preset.selected');
-  const capacity = parseFloat(capBtn.dataset.val);
-  const volInput = document.getElementById('cart-new-volume').value;
-  const volume = volInput === '' ? capacity : parseFloat(volInput);
-  const conc = parseFloat(document.getElementById('cart-new-conc').value);
-  const label = document.getElementById('cart-new-label').value.trim();
-
-  if (isNaN(conc) || conc <= 0) { showToast('Enter a concentration', 'error'); return; }
-  if (isNaN(volume) || volume <= 0) { showToast('Enter a fill volume', 'error'); return; }
-  if (volume > capacity) { showToast('Fill volume exceeds capacity', 'error'); return; }
-
-  const carts = getCartridges();
-  const newPep = document.getElementById('cart-new-peptide').value || DEFAULT_PEPTIDE;
-  const newP = PEPTIDES[newPep] || PEPTIDES[DEFAULT_PEPTIDE];
-  carts.push({
-    id: String(Date.now()),
-    label: label || `Cartridge ${String.fromCharCode(65 + carts.length)}`,
-    capacity, remaining: volume, conc,
-    peptide: newPep,
-    doseAmt: newP.unit === 'mcg' ? (newP.doses[0] || 0) : getCartSettings().doseMg,
-    created: Date.now(),
-  });
-  saveCartridges(carts);
-  document.getElementById('cart-new-label').value = '';
-  document.getElementById('cart-new-volume').value = '';
-  renderCartridges();
-  showToast('Cartridge added');
-});
-
 ['cart-prime-units', 'cart-dose-mg', 'cart-shelf-days'].forEach(id => {
   document.getElementById(id).addEventListener('input', () => {
     const set = getCartSettings();
@@ -5845,7 +5776,7 @@ window.addEventListener('resize', () => {
 
 // Initial render
 // Bumped whenever a build ships so the running version is visible in-app.
-const APP_VERSION = '2026.09.16-inject-logs-dose';
+const APP_VERSION = '2026.09.16-calc-only-cartridges';
 
 // Reloads bypassing the HTTP cache. GitHub Pages serves max-age=600 and iOS
 // standalone webapps hold on longer still, so the cache-buster is explicit.

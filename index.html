@@ -2542,10 +2542,10 @@ const PEPTIDES = {
     halfLife: 2, ka: 8, F: 0.7,
     doses: [100, 200, 300], intervalHours: 24, cadence: 'Daily',
     tiers: [
-      { name: 'Starting dose', dose: 200, weeks: [1, 4] },
-      { name: 'Optional step', dose: 300, weeks: [5, 26] },
+      { name: 'Adjustment week', dose: 200, weeks: [1, 1], note: 'One week at 200 mcg to read how you respond before settling in.' },
+      { name: 'Working dose', dose: 300, weeks: [2, 8], note: 'Top of the commonly cited per-injection range. Hold here for the rest of the block.' },
     ],
-    tierNote: 'Commonly run flat at 200-300 mcg. Step up only if the lower dose plateaus.',
+    tierNote: '200-300 mcg is the per-injection range, not a daily total -- this schedule assumes one shot nightly. There is no approved ipamorelin dose; these are community and clinic conventions.',
     vialPresets: [5, 10, 15], affectsWeight: false,
     cycle: { onWeeks: 8, offWeeks: 4 },
     guidance: {
@@ -3481,7 +3481,6 @@ function renderSchedulePeptideTabs() {
 }
 
 function renderProtocol() {
-  const protocol = getProtocol();
   const container = document.getElementById('protocol-timeline');
 
   const primary = PEPTIDES[getPrimaryPeptideKey()];
@@ -3498,11 +3497,6 @@ function renderProtocol() {
   const noteEarly = document.getElementById('tier-note');
   if (noteEarly) noteEarly.textContent = (PEPTIDES[getSchedulePeptideKey()].tierNote) || '';
 
-  if (!protocol) {
-    container.innerHTML = '<div class="empty-state">Set your protocol start date above to see the escalation timeline.</div>';
-    return;
-  }
-
   const schedKey = getSchedulePeptideKey();
   const schedP = PEPTIDES[schedKey];
 
@@ -3518,7 +3512,19 @@ function renderProtocol() {
   const daysSinceStart = Math.floor((today - startDate) / (1000 * 60 * 60 * 24));
   const currentWeek = Math.max(1, Math.floor(daysSinceStart / 7) + 1);
 
-  const tiers = schedP.tiers || [];
+  // Tiers are authored against the peptide's default cycle, so clamp them to
+  // whatever window is actually selected. Without this a schedule can run past
+  // the end of its own on-block, or stop short of it.
+  const onWeeks = (cycleFor(schedKey) || {}).onWeeks;
+  let tiers = schedP.tiers || [];
+  if (onWeeks > 0 && tiers.length) {
+    tiers = tiers
+      .filter(t => t.weeks[0] <= onWeeks)
+      .map((t, i, arr) => i === arr.length - 1
+        ? { ...t, weeks: [t.weeks[0], Math.max(t.weeks[0], onWeeks)] }
+        : { ...t, weeks: [t.weeks[0], Math.min(t.weeks[1], onWeeks)] });
+  }
+
   const noteEl = document.getElementById('tier-note');
   if (noteEl) noteEl.textContent = schedP.tierNote || '';
 
@@ -5523,7 +5529,7 @@ window.addEventListener('resize', () => {
 
 // Initial render
 // Bumped whenever a build ships so the running version is visible in-app.
-const APP_VERSION = '2026.09.07-local-dates';
+const APP_VERSION = '2026.09.16-ipa-titration';
 
 // Reloads bypassing the HTTP cache. GitHub Pages serves max-age=600 and iOS
 // standalone webapps hold on longer still, so the cache-buster is explicit.

@@ -351,6 +351,51 @@ nav::-webkit-scrollbar { display: none; width: 0; height: 0; }
 .cart-calc-row span:first-child { color: var(--text-muted); flex: 0 0 auto; }
 .cart-calc-row span:last-child { font-weight: 600; text-align: right; overflow-wrap: anywhere; }
 
+.site-modal-sub {
+  margin-top: -6px;
+  margin-bottom: 12px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.site-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.site-opt {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-height: 62px;
+  padding: 10px 8px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+  cursor: pointer;
+}
+
+.site-opt.suggested {
+  border-color: var(--accent);
+  background: rgba(108, 92, 231, 0.14);
+}
+
+.site-opt-tag {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
 .cart-calc-form { margin-top: 6px; }
 
 .cart-calc-form label {
@@ -2065,10 +2110,10 @@ nav::-webkit-scrollbar { display: none; width: 0; height: 0; }
               <label for="dose-site">Injection Site</label>
               <select id="dose-site">
                 <option value="">Select site</option>
-                <option value="abdomen-upper-left">Abdomen (Upper Left)</option>
-                <option value="abdomen-upper-right">Abdomen (Upper Right)</option>
                 <option value="abdomen-lower-left">Abdomen (Lower Left)</option>
                 <option value="abdomen-lower-right">Abdomen (Lower Right)</option>
+                <option value="glute-left">Glute (Left)</option>
+                <option value="glute-right">Glute (Right)</option>
               </select>
               <div class="site-suggestion" id="site-suggestion"></div>
             </div>
@@ -2476,6 +2521,17 @@ nav::-webkit-scrollbar { display: none; width: 0; height: 0; }
     </div>
   </div>
 
+  <div id="site-modal" class="modal-overlay">
+    <div class="modal">
+      <p id="site-modal-title">Where are you injecting?</p>
+      <p class="site-modal-sub" id="site-modal-sub"></p>
+      <div class="site-grid" id="site-grid"></div>
+      <div class="modal-actions">
+        <button class="btn-secondary" id="site-cancel">Cancel</button>
+      </div>
+    </div>
+  </div>
+
   <script>
 // Profile system
 function getProfiles() {
@@ -2814,6 +2870,40 @@ document.getElementById('confirm-cancel').addEventListener('click', () => {
   if (confirmResolve) confirmResolve(false);
 });
 
+// Site picker. Resolves to a site key, or null if dismissed.
+let siteResolve = null;
+
+function showSitePicker(subtitle) {
+  return new Promise(resolve => {
+    siteResolve = resolve;
+    document.getElementById('site-modal-sub').textContent = subtitle || '';
+    const suggested = nextSuggestedSite();
+    document.getElementById('site-grid').innerHTML = SITE_ORDER.map(k => `
+      <button type="button" class="site-opt${k === suggested ? ' suggested' : ''}" data-site="${k}">
+        <span>${SITE_LABELS[k]}</span>
+        ${k === suggested ? '<span class="site-opt-tag">Next in rotation</span>' : ''}
+      </button>`).join('');
+    document.getElementById('site-modal').classList.add('visible');
+  });
+}
+
+function closeSitePicker(value) {
+  document.getElementById('site-modal').classList.remove('visible');
+  const r = siteResolve;
+  siteResolve = null;
+  if (r) r(value);
+}
+
+document.getElementById('site-grid').addEventListener('click', e => {
+  const btn = e.target.closest('.site-opt');
+  if (btn) closeSitePicker(btn.dataset.site);
+});
+
+document.getElementById('site-cancel').addEventListener('click', () => closeSitePicker(null));
+document.getElementById('site-modal').addEventListener('click', e => {
+  if (e.target.id === 'site-modal') closeSitePicker(null);
+});
+
 // Navigation
 document.querySelectorAll('.nav-btn').forEach(btn => {
   btn.addEventListener('click', () => {
@@ -2861,11 +2951,20 @@ document.querySelectorAll('.side-effect-chip').forEach(chip => {
 });
 
 // Site rotation suggestion
-const SITE_ORDER = ['abdomen-upper-left','abdomen-upper-right','abdomen-lower-left','abdomen-lower-right'];
+const SITE_ORDER = ['abdomen-lower-left','abdomen-lower-right','glute-left','glute-right'];
 const SITE_LABELS = {
-  'abdomen-upper-left': 'Abdomen (Upper Left)', 'abdomen-upper-right': 'Abdomen (Upper Right)',
   'abdomen-lower-left': 'Abdomen (Lower Left)', 'abdomen-lower-right': 'Abdomen (Lower Right)',
+  'glute-left': 'Glute (Left)', 'glute-right': 'Glute (Right)',
 };
+
+// Next site in the rotation after the last one used. Falls back to the first
+// site when nothing is logged yet, or when the last one was a retired site.
+function nextSuggestedSite() {
+  const lastSite = [...getDoses()].reverse().find(d => d.site)?.site;
+  const idx = SITE_ORDER.indexOf(lastSite);
+  if (idx === -1) return SITE_ORDER[0];
+  return SITE_ORDER[(idx + 1) % SITE_ORDER.length];
+}
 
 function updateSiteSuggestion() {
   const doses = getDoses();
@@ -2873,9 +2972,8 @@ function updateSiteSuggestion() {
   if (!doses.length) { el.textContent = ''; return; }
   const lastSite = [...doses].reverse().find(d => d.site)?.site;
   if (!lastSite) { el.textContent = ''; return; }
-  const idx = SITE_ORDER.indexOf(lastSite);
-  const next = SITE_ORDER[(idx + 1) % SITE_ORDER.length];
-  el.textContent = `Suggested: ${SITE_LABELS[next]} (rotate from ${SITE_LABELS[lastSite]})`;
+  const next = nextSuggestedSite();
+  el.textContent = `Suggested: ${SITE_LABELS[next]} (rotate from ${SITE_LABELS[lastSite] || lastSite})`;
 }
 
 // Dose form
@@ -3332,10 +3430,13 @@ function renderDoseHistory() {
   }
 
   const siteLabels = {
-    'abdomen-upper-left': 'Abdomen (UL)',
-    'abdomen-upper-right': 'Abdomen (UR)',
     'abdomen-lower-left': 'Abdomen (LL)',
     'abdomen-lower-right': 'Abdomen (LR)',
+    'glute-left': 'Glute (L)',
+    'glute-right': 'Glute (R)',
+    // Retired sites, kept so existing entries still read properly.
+    'abdomen-upper-left': 'Abdomen (UL)',
+    'abdomen-upper-right': 'Abdomen (UR)',
     'abdomen-left': 'Abdomen (L)',
     'abdomen-right': 'Abdomen (R)',
   };
@@ -5541,17 +5642,53 @@ document.getElementById('cart-list').addEventListener('click', e => {
   if (!c) return;
   const cp = PEPTIDES[c.peptide] || PEPTIDES[DEFAULT_PEPTIDE];
   const primeMl = set.primeUnits / UNITS_PER_ML;
+  // An injection always includes the priming volume; priming alone does not.
   const need = act === 'inject' ? cartDoseMg(c) / c.conc + primeMl : primeMl;
-
 
   if (c.remaining < need - 1e-9) {
     showToast('Not enough left in this cartridge', 'error');
     return;
   }
-  updateCartridge(id, x => { x.remaining -= need; });
-  showToast(act === 'inject'
-    ? `Injected ${cartDoseAmt(c)}${cp.unit} (+${set.primeUnits}u prime)`
-    : `Primed ${set.primeUnits}u`);
+
+  if (act === 'prime') {
+    updateCartridge(id, x => { x.remaining -= need; });
+    showToast(`Primed ${set.primeUnits}u`);
+    return;
+  }
+
+  // Injecting asks where, then writes a dose entry as well as taking the
+  // volume -- otherwise this button and the dose log drift apart.
+  const doseAmt = cartDoseAmt(c);
+  showSitePicker(`${doseAmt}${cp.unit} from ${c.label}`).then(site => {
+    if (!site) return;
+    const now = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    const entry = {
+      date: `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`,
+      time: `${pad(now.getHours())}:${pad(now.getMinutes())}`,
+      amount: doseAmt,
+      peptide: c.peptide || DEFAULT_PEPTIDE,
+      site,
+      notes: '',
+      sideEffects: [],
+      id: Date.now().toString(),
+      // Recorded here because this path takes the volume itself; the dose
+      // form's auto-deduct must not take it a second time.
+      cartridgeId: c.id,
+      mlUsed: need,
+    };
+
+    updateCartridge(id, x => { x.remaining -= need; });
+    const doses = getDoses();
+    doses.push(entry);
+    doses.sort((a, b) => `${a.date}T${a.time || '09:00'}`.localeCompare(`${b.date}T${b.time || '09:00'}`));
+    save(STORAGE_KEYS.doses, doses);
+
+    renderDoseHistory();
+    updateSiteSuggestion();
+    renderDashboard();
+    showToast(`Injected ${doseAmt}${cp.unit} into ${SITE_LABELS[site]} (+${set.primeUnits}u prime)`);
+  });
 });
 
 document.getElementById('cart-list').addEventListener('input', e => {
@@ -5708,7 +5845,7 @@ window.addEventListener('resize', () => {
 
 // Initial render
 // Bumped whenever a build ships so the running version is visible in-app.
-const APP_VERSION = '2026.09.16-fill-from-log';
+const APP_VERSION = '2026.09.16-inject-logs-dose';
 
 // Reloads bypassing the HTTP cache. GitHub Pages serves max-age=600 and iOS
 // standalone webapps hold on longer still, so the cache-buster is explicit.

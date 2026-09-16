@@ -1222,6 +1222,42 @@ nav::-webkit-scrollbar { display: none; width: 0; height: 0; }
   letter-spacing: 0.02em;
 }
 
+.protocol-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.protocol-head h2 { margin: 0; }
+
+#protocol-edit-btn {
+  padding: 5px 12px;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  background: rgba(108, 92, 231, 0.14);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+#protocol-summary { margin-top: 12px; }
+
+.protocol-sum-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 8px 0;
+  font-size: 13px;
+  border-bottom: 1px solid var(--border);
+}
+
+.protocol-sum-row:last-child { border-bottom: none; }
+.protocol-sum-row span:first-child { color: var(--text-muted); }
+.protocol-sum-row span:last-child { font-weight: 600; }
+
 .sched-edit-btn {
   padding: 5px 10px;
   border: 1px solid var(--accent);
@@ -2496,8 +2532,12 @@ nav::-webkit-scrollbar { display: none; width: 0; height: 0; }
           <h2 id="protocol-title">Retatrutide Protocol</h2>
           <p class="protocol-desc" id="protocol-desc">GLP-1/GIP/Glucagon triple receptor agonist. Weekly subcutaneous injection with dose escalation.</p>
         </div>
-        <div class="form-card">
-          <h2>Protocol Settings</h2>
+        <div class="form-card" id="protocol-card">
+          <div class="protocol-head">
+            <h2>Protocol Settings</h2>
+            <button type="button" id="protocol-edit-btn" hidden>Edit</button>
+          </div>
+          <div id="protocol-summary" hidden></div>
           <form id="protocol-form">
             <div class="form-group">
               <label for="protocol-start">Start Date</label>
@@ -3397,9 +3437,47 @@ document.getElementById('protocol-form').addEventListener('submit', e => {
   if (!startDate || isNaN(startWeight)) return;
 
   save(STORAGE_KEYS.protocol, { startDate, height, startWeight, goalWeight });
+  protocolEditing = false;
   showToast('Protocol saved');
   renderProtocol();
   renderDashboard();
+});
+
+// The protocol is set once and rarely revisited, so it collapses to a summary.
+let protocolEditing = false;
+
+function renderProtocolSettings() {
+  const protocol = getProtocol();
+  const form = document.getElementById('protocol-form');
+  const summary = document.getElementById('protocol-summary');
+  const editBtn = document.getElementById('protocol-edit-btn');
+  if (!form || !summary || !editBtn) return;
+
+  const isSet = !!(protocol && protocol.startDate);
+  const showForm = !isSet || protocolEditing;
+
+  form.hidden = !showForm;
+  summary.hidden = showForm;
+  editBtn.hidden = !isSet;
+  editBtn.textContent = showForm ? 'Cancel' : 'Edit';
+
+  if (!isSet) return;
+
+  const rows = [
+    ['Start', formatDate(protocol.startDate)],
+    ['Height', protocol.height ? `${protocol.height} in` : null],
+    ['Starting weight', `${protocol.startWeight} lbs`],
+    ['Goal weight', protocol.goalWeight ? `${protocol.goalWeight} lbs` : null],
+  ].filter(([, v]) => v);
+
+  summary.innerHTML = rows.map(([l, v]) =>
+    `<div class="protocol-sum-row"><span>${l}</span><span>${v}</span></div>`).join('');
+}
+
+document.getElementById('protocol-edit-btn').addEventListener('click', () => {
+  protocolEditing = !protocolEditing;
+  if (protocolEditing) loadProtocolForm();
+  renderProtocolSettings();
 });
 
 // Render weight history
@@ -3652,6 +3730,7 @@ function renderProtocol() {
       .filter(Boolean).join(' ');
   }
 
+  renderProtocolSettings();
   renderSchedulePeptideTabs();
   const noteEarly = document.getElementById('tier-note');
   if (noteEarly) noteEarly.textContent = (PEPTIDES[getSchedulePeptideKey()].tierNote) || '';
@@ -5972,7 +6051,7 @@ window.addEventListener('resize', () => {
 
 // Initial render
 // Bumped whenever a build ships so the running version is visible in-app.
-const APP_VERSION = '2026.09.16-editable-schedule';
+const APP_VERSION = '2026.09.16-collapse-protocol';
 
 // Reloads bypassing the HTTP cache. GitHub Pages serves max-age=600 and iOS
 // standalone webapps hold on longer still, so the cache-buster is explicit.

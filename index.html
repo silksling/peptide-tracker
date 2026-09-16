@@ -1222,6 +1222,73 @@ nav::-webkit-scrollbar { display: none; width: 0; height: 0; }
   letter-spacing: 0.02em;
 }
 
+.sched-edit-btn {
+  padding: 5px 10px;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  background: rgba(108, 92, 231, 0.14);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.tier-editor { padding: 2px 0; }
+
+.tier-edit-head,
+.tier-edit-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 34px;
+  gap: 8px;
+  align-items: center;
+}
+
+.tier-edit-head {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+.tier-edit-row { margin-bottom: 8px; }
+
+.tier-edit-row input {
+  width: 100%;
+  padding: 9px 10px;
+  font-size: 16px;
+  min-height: 42px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.tier-edit-del {
+  min-height: 42px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.tier-edit-add { width: 100%; padding: 9px; font-size: 12px; }
+
+.tier-edit-note {
+  margin: 10px 0 12px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.tier-edit-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.tier-edit-actions button { flex: 1 1 auto; padding: 10px; font-size: 12px; }
+
 .sched-start-clear {
   padding: 5px 10px;
   border: 1px solid var(--border);
@@ -2656,6 +2723,7 @@ const STORAGE_KEYS = {
   get protocol() { return 'pt_protocol_' + getActiveProfileId(); },
   get peptides() { return 'pt_peptides_' + getActiveProfileId(); },
   get pepStarts() { return 'pt_pepstarts_' + getActiveProfileId(); },
+  get tiers() { return 'pt_tiers_' + getActiveProfileId(); },
 };
 
 function renderProfilePicker() {
@@ -3450,6 +3518,52 @@ function renderDoseHistory() {
 // Render protocol timeline
 let schedulePeptide = null;
 
+// Per-profile schedule overrides, stored as durations rather than absolute
+// week ranges so editing one step shifts the rest instead of leaving gaps.
+function getTierOverrides() {
+  return load(STORAGE_KEYS.tiers) || {};
+}
+
+function saveTierOverrides(obj) {
+  save(STORAGE_KEYS.tiers, obj);
+}
+
+function setTiersFor(pepKey, steps) {
+  const all = getTierOverrides();
+  if (steps) all[pepKey] = steps; else delete all[pepKey];
+  saveTierOverrides(all);
+}
+
+// A peptide's schedule as editable steps: dose plus how many weeks it runs.
+function tierStepsFor(pepKey) {
+  const override = getTierOverrides()[pepKey];
+  if (Array.isArray(override) && override.length) return override;
+  return (PEPTIDES[pepKey].tiers || []).map(t => ({
+    name: t.name,
+    dose: t.dose,
+    weeks: t.weeks[1] - t.weeks[0] + 1,
+    note: t.note,
+  }));
+}
+
+function isTiersOverridden(pepKey) {
+  return Array.isArray(getTierOverrides()[pepKey]);
+}
+
+// Turns steps back into the running week ranges the timeline draws.
+function tiersFromSteps(steps) {
+  let cursor = 1;
+  return steps.map((st, i) => {
+    const span = Math.max(1, Math.round(st.weeks || 1));
+    // An edited schedule has no authored names; the final step is where you
+    // settle, so call it a hold rather than another escalation.
+    const name = st.name || (i === steps.length - 1 && steps.length > 1 ? 'Hold' : `Step ${i + 1}`);
+    const tier = { name, dose: st.dose, weeks: [cursor, cursor + span - 1], note: st.note };
+    cursor += span;
+    return tier;
+  });
+}
+
 function getPepStarts() {
   return load(STORAGE_KEYS.pepStarts) || {};
 }
@@ -3483,7 +3597,9 @@ function renderScheduleStartControl(pepKey, info) {
     <label for="sched-start-input">${p.name} start</label>
     <input type="date" id="sched-start-input" value="${val}">
     <span class="sched-start-src">${info ? info.source : 'not set'}</span>
-    ${getPepStarts()[pepKey] ? '<button type="button" class="sched-start-clear">Reset</button>' : ''}`;
+    ${getPepStarts()[pepKey] ? '<button type="button" class="sched-start-clear">Reset</button>' : ''}
+    <button type="button" class="sched-edit-btn">${scheduleEditing === pepKey ? 'Done' : 'Edit schedule'}</button>
+    ${isTiersOverridden(pepKey) ? '<span class="sched-start-src">customised</span>' : ''}`;
 
   wrap.querySelector('#sched-start-input').addEventListener('change', e => {
     setPepStart(pepKey, e.target.value || null);
@@ -3491,6 +3607,11 @@ function renderScheduleStartControl(pepKey, info) {
   });
   const clear = wrap.querySelector('.sched-start-clear');
   if (clear) clear.addEventListener('click', () => { setPepStart(pepKey, null); renderProtocol(); });
+
+  wrap.querySelector('.sched-edit-btn').addEventListener('click', () => {
+    scheduleEditing = scheduleEditing === pepKey ? null : pepKey;
+    renderProtocol();
+  });
 }
 
 function getSchedulePeptideKey() {
@@ -3554,7 +3675,7 @@ function renderProtocol() {
   // whatever window is actually selected. Without this a schedule can run past
   // the end of its own on-block, or stop short of it.
   const onWeeks = (cycleFor(schedKey) || {}).onWeeks;
-  let tiers = schedP.tiers || [];
+  let tiers = tiersFromSteps(tierStepsFor(schedKey));
   if (onWeeks > 0 && tiers.length) {
     tiers = tiers
       .filter(t => t.weeks[0] <= onWeeks)
@@ -3568,6 +3689,11 @@ function renderProtocol() {
 
   if (!tiers.length) {
     container.innerHTML = '<div class="empty-state">No escalation schedule for this peptide.</div>';
+    return;
+  }
+
+  if (scheduleEditing === schedKey) {
+    renderTierEditor(schedKey, container);
     return;
   }
 
@@ -3600,6 +3726,82 @@ function renderProtocol() {
         ${tier.note ? `<div class="tier-sub">${tier.note}</div>` : ''}
       </div>`;
   }).join('');
+}
+
+// Which peptide's schedule is open for editing, if any.
+let scheduleEditing = null;
+
+function renderTierEditor(pepKey, container) {
+  const p = PEPTIDES[pepKey];
+  const steps = tierStepsFor(pepKey);
+  container.innerHTML = `
+    <div class="tier-editor">
+      <div class="tier-edit-head">
+        <span>Dose (${p.unit})</span><span>Weeks</span><span></span>
+      </div>
+      ${steps.map((st, i) => `
+        <div class="tier-edit-row" data-i="${i}">
+          <input type="number" inputmode="decimal" data-k="dose" step="any" min="0" value="${st.dose}">
+          <input type="number" inputmode="numeric" data-k="weeks" step="1" min="1" value="${st.weeks}">
+          <button type="button" class="tier-edit-del" title="Remove step">&times;</button>
+        </div>`).join('')}
+      <button type="button" class="btn-secondary tier-edit-add">Add step</button>
+      <p class="tier-edit-note">Steps run back to back from your start date. Delete the ones above the dose you are holding at, and give the last step as many weeks as you intend to stay on it.</p>
+      <div class="tier-edit-actions">
+        <button type="button" class="btn-primary tier-edit-save">Save schedule</button>
+        <button type="button" class="btn-secondary tier-edit-cancel">Cancel</button>
+        ${isTiersOverridden(pepKey) ? '<button type="button" class="btn-secondary tier-edit-reset">Reset to default</button>' : ''}
+      </div>
+    </div>`;
+
+  const readSteps = () => [...container.querySelectorAll('.tier-edit-row')].map(row => {
+    const dose = parseFloat(row.querySelector('[data-k="dose"]').value);
+    const weeks = parseInt(row.querySelector('[data-k="weeks"]').value, 10);
+    return { dose, weeks };
+  });
+
+  container.querySelector('.tier-edit-add').addEventListener('click', () => {
+    const cur = readSteps();
+    const last = cur[cur.length - 1];
+    setTiersFor(pepKey, [...cur, { dose: last ? last.dose : (p.doses[0] || 0), weeks: 4 }]);
+    renderProtocol();
+  });
+
+  container.querySelectorAll('.tier-edit-del').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const cur = readSteps();
+      const i = +btn.closest('.tier-edit-row').dataset.i;
+      if (cur.length <= 1) { showToast('Keep at least one step', 'error'); return; }
+      cur.splice(i, 1);
+      setTiersFor(pepKey, cur);
+      renderProtocol();
+    });
+  });
+
+  container.querySelector('.tier-edit-save').addEventListener('click', () => {
+    const cur = readSteps();
+    if (cur.some(st => isNaN(st.dose) || st.dose <= 0 || isNaN(st.weeks) || st.weeks < 1)) {
+      showToast('Every step needs a dose and at least one week', 'error');
+      return;
+    }
+    setTiersFor(pepKey, cur);
+    scheduleEditing = null;
+    renderProtocol();
+    showToast('Schedule saved');
+  });
+
+  container.querySelector('.tier-edit-cancel').addEventListener('click', () => {
+    scheduleEditing = null;
+    renderProtocol();
+  });
+
+  const reset = container.querySelector('.tier-edit-reset');
+  if (reset) reset.addEventListener('click', () => {
+    setTiersFor(pepKey, null);
+    scheduleEditing = null;
+    renderProtocol();
+    showToast('Schedule reset to default');
+  });
 }
 
 // Chart drawing
@@ -5770,7 +5972,7 @@ window.addEventListener('resize', () => {
 
 // Initial render
 // Bumped whenever a build ships so the running version is visible in-app.
-const APP_VERSION = '2026.09.16-drop-default-dose';
+const APP_VERSION = '2026.09.16-editable-schedule';
 
 // Reloads bypassing the HTTP cache. GitHub Pages serves max-age=600 and iOS
 // standalone webapps hold on longer still, so the cache-buster is explicit.

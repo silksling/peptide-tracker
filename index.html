@@ -2399,11 +2399,6 @@ nav::-webkit-scrollbar { display: none; width: 0; height: 0; }
             <p style="font-size:11px;color:var(--text-muted);margin-top:4px;">Days from mixing before a cartridge should be discarded. 30 is typical for reconstituted peptide kept refrigerated.</p>
           </div>
           <div class="form-group">
-            <label>Default Dose (mg)</label>
-            <input type="number" id="cart-dose-mg" step="0.1" min="0.1" value="2">
-            <p style="font-size:11px;color:var(--text-muted);margin-top:4px;">Starting dose for new mg-based cartridges. Each cartridge can be changed on its own card.</p>
-          </div>
-          <div class="form-group">
             <label style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
               <span>Auto-deduct on logged dose</span>
               <label class="toggle-switch" style="margin:0;">
@@ -5115,6 +5110,9 @@ function updateCartridgePlan() {
         remaining: parseFloat(btn.dataset.ml),
         conc: parseFloat(btn.dataset.conc),
         peptide: calcState.peptide || DEFAULT_PEPTIDE,
+        // The dose this mix was calculated around, so the cartridge opens on
+        // the right injection amount without consulting a global default.
+        doseAmt: calcState.dose,
         created: Date.now(),
         // Snapshot of how this cartridge was mixed. Stored on the cartridge
         // rather than read live, so later calculator edits cannot rewrite the
@@ -5159,9 +5157,9 @@ function saveCartridges(list) {
 
 function getCartSettings() {
   try {
-    return Object.assign({ primeUnits: 1, doseMg: 2 },
+    return Object.assign({ primeUnits: 1 },
       JSON.parse(localStorage.getItem('pt_cartset_' + getActiveProfileId())) || {});
-  } catch { return { primeUnits: 1, doseMg: 2 }; }
+  } catch { return { primeUnits: 1 }; }
 }
 
 // Beyond-use date for a reconstituted cartridge. 30 days refrigerated is the
@@ -5202,13 +5200,11 @@ function cartExpiryHtml(cart) {
 }
 
 // Each cartridge carries its own injection amount, in that peptide's unit.
-// Cartridges created before per-cartridge dosing fall back to the global
-// default so their maths is unchanged.
+// Older cartridges without one fall back to that peptide's first dose preset.
 function cartDoseAmt(cart) {
   const p = PEPTIDES[cart.peptide] || PEPTIDES[DEFAULT_PEPTIDE];
   if (cart.doseAmt != null && !isNaN(cart.doseAmt)) return cart.doseAmt;
-  if (p.unit === 'mcg') return p.doses[0] || 0;
-  return getCartSettings().doseMg;
+  return p.doses[0] || 0;
 }
 
 // Concentration is always stored mg/ml, so mcg-dosed peptides convert down.
@@ -5690,14 +5686,13 @@ document.getElementById('cart-list').addEventListener('change', e => {
   renderCartridges();
 });
 
-['cart-prime-units', 'cart-dose-mg', 'cart-shelf-days'].forEach(id => {
+['cart-prime-units', 'cart-shelf-days'].forEach(id => {
   document.getElementById(id).addEventListener('input', () => {
     const set = getCartSettings();
     const v = parseFloat(document.getElementById(id).value);
     if (isNaN(v) || v < 0) return;
     if (id === 'cart-prime-units') set.primeUnits = v;
-    else if (id === 'cart-shelf-days') set.shelfDays = v;
-    else set.doseMg = v;
+    else set.shelfDays = v;
     saveCartSettings(set);
     renderCartridges();
   });
@@ -5713,7 +5708,6 @@ document.getElementById('cart-auto-deduct').addEventListener('change', e => {
 function loadCartSettingsForm() {
   const set = getCartSettings();
   document.getElementById('cart-prime-units').value = set.primeUnits;
-  document.getElementById('cart-dose-mg').value = set.doseMg;
   document.getElementById('cart-shelf-days').value = cartShelfDays();
   document.getElementById('cart-auto-deduct').checked = set.autoDeduct !== false;
 }
@@ -5776,7 +5770,7 @@ window.addEventListener('resize', () => {
 
 // Initial render
 // Bumped whenever a build ships so the running version is visible in-app.
-const APP_VERSION = '2026.09.16-calc-only-cartridges';
+const APP_VERSION = '2026.09.16-drop-default-dose';
 
 // Reloads bypassing the HTTP cache. GitHub Pages serves max-age=600 and iOS
 // standalone webapps hold on longer still, so the cache-buster is explicit.

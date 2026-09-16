@@ -351,6 +351,52 @@ nav::-webkit-scrollbar { display: none; width: 0; height: 0; }
 .cart-calc-row span:first-child { color: var(--text-muted); flex: 0 0 auto; }
 .cart-calc-row span:last-child { font-weight: 600; text-align: right; overflow-wrap: anywhere; }
 
+.cart-calc-form { margin-top: 6px; }
+
+.cart-calc-form label {
+  display: block;
+  margin-top: 8px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.cart-calc-form input[type="number"],
+.cart-calc-form select {
+  width: 100%;
+  margin-top: 3px;
+  padding: 9px 10px;
+  font-size: 16px;
+  min-height: 42px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.cart-calc-check {
+  display: flex !important;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px !important;
+}
+
+.cart-calc-check input {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.cart-calc-save {
+  width: 100%;
+  margin-top: 10px;
+  padding: 9px;
+  font-size: 12px;
+}
+
 .cart-calc-note {
   margin-top: 8px;
   font-size: 10px;
@@ -5314,8 +5360,49 @@ function cartridgeSvg(cart) {
   </svg>`;
 }
 
+// Holdup volume by filter diameter, matching the calculator's presets.
+const FILTER_BASE_LOSS = { 4: 0.05, 13: 0.28, 25: 0.55, 33: 1.0 };
+const RECOVERY_FACTORS = { '1': 'No purge', '0.3': 'Air purge', '0.15': 'Air + water chase' };
+
+// Form for recording how a cartridge was mixed when there is no snapshot --
+// either it was added by hand, or it predates mix details being captured.
+function cartCalcFormHtml(c) {
+  const cp = PEPTIDES[c.peptide] || PEPTIDES[DEFAULT_PEPTIDE];
+  const guessAmt = Math.round(c.capacity * c.conc * 10) / 10;
+  return `<div class="cart-calc-form" data-id="${c.id}">
+    <p class="cart-calc-note">No mix recorded for this one. Fill in what you used and it will show here like any other.</p>
+    <label>Peptide in vial (mg)
+      <input type="number" inputmode="decimal" data-f="peptideAmt" step="0.1" min="0" placeholder="e.g. ${guessAmt}">
+    </label>
+    <label>BAC water (ml)
+      <input type="number" inputmode="decimal" data-f="bacWater" step="0.1" min="0" placeholder="e.g. ${c.capacity}">
+    </label>
+    <label class="cart-calc-check">
+      <input type="checkbox" data-f="useFilter"> Used a PES filter
+    </label>
+    <div class="cart-calc-filter" hidden>
+      <label>Filter diameter
+        <select data-f="diameter">
+          <option value="4">4 mm</option>
+          <option value="13" selected>13 mm</option>
+          <option value="25">25 mm</option>
+          <option value="33">33 mm</option>
+        </select>
+      </label>
+      <label>Recovery method
+        <select data-f="filterRecovery">
+          <option value="1">No purge</option>
+          <option value="0.3">Air purge</option>
+          <option value="0.15" selected>Air + water chase</option>
+        </select>
+      </label>
+    </div>
+    <button type="button" class="btn-secondary cart-calc-save">Save mix details</button>
+  </div>`;
+}
+
 // Mix details for one cartridge, from the snapshot taken when it was sent
-// over from the calculator. Cartridges added by hand have no snapshot.
+// over from the calculator, or entered by hand afterwards.
 function cartCalcDetailsHtml(c) {
   const cp = PEPTIDES[c.peptide] || PEPTIDES[DEFAULT_PEPTIDE];
   const rows = [];
@@ -5353,10 +5440,10 @@ function cartCalcDetailsHtml(c) {
     `<div class="cart-calc-row"><span>${l}</span><span>${v}</span></div>`).join('');
 
   return `<details class="cart-calc">
-    <summary>${cal ? 'Mix details' : 'Details'}${cal && cal.useFilter ? ` &middot; ${cal.diameter || ''}mm filter` : ''}</summary>
+    <summary>${cal ? 'Mix details' : 'Details'}${cal && cal.useFilter ? ` &middot; ${cal.diameter || ''}mm filter` : ''}${cal && cal.enteredManually ? ' &middot; entered by you' : ''}</summary>
     <div class="cart-calc-body">
       ${body}
-      ${cal ? '' : '<p class="cart-calc-note">Added by hand, so there is no calculator record of how it was mixed. Sending one over from the Calc tab captures its filter and reconstitution settings.</p>'}
+      ${cal ? '' : cartCalcFormHtml(c)}
     </div>
   </details>`;
 }
@@ -5434,6 +5521,48 @@ function updateCartridge(id, fn) {
 // Only these are click actions. The card also carries data-act="slider" and
 // data-act="dose" on inputs, and without this whitelist tapping the dose
 // field fell through to the prime branch below.
+// Reveal the filter fields only when the filter box is ticked, and save the
+// entered mix onto the cartridge.
+document.getElementById('cart-list').addEventListener('change', e => {
+  const box = e.target.closest('[data-f="useFilter"]');
+  if (!box) return;
+  const form = box.closest('.cart-calc-form');
+  form.querySelector('.cart-calc-filter').hidden = !box.checked;
+});
+
+document.getElementById('cart-list').addEventListener('click', e => {
+  const save = e.target.closest('.cart-calc-save');
+  if (!save) return;
+  const form = save.closest('.cart-calc-form');
+  const val = f => form.querySelector(`[data-f="${f}"]`);
+
+  const peptideAmt = parseFloat(val('peptideAmt').value);
+  const bacWater = parseFloat(val('bacWater').value);
+  if (isNaN(peptideAmt) || peptideAmt <= 0 || isNaN(bacWater) || bacWater <= 0) {
+    showToast('Enter the vial amount and BAC water', 'error');
+    return;
+  }
+
+  const useFilter = val('useFilter').checked;
+  const diameter = useFilter ? val('diameter').value : null;
+  const recovery = useFilter ? parseFloat(val('filterRecovery').value) : 1;
+  const base = useFilter ? (FILTER_BASE_LOSS[diameter] || 0) : 0;
+
+  updateCartridge(form.dataset.id, c => {
+    c.calc = {
+      peptideAmt, bacWater, useFilter,
+      filterBaseLoss: base,
+      filterRecovery: recovery,
+      filterLoss: base * recovery,
+      filterMethod: 'reduce',
+      micron: useFilter ? '0.22' : null,
+      diameter,
+      enteredManually: true,
+    };
+  });
+  showToast('Mix details saved');
+});
+
 const CART_CLICK_ACTIONS = ['del', 'refill', 'inject', 'prime'];
 
 document.getElementById('cart-list').addEventListener('click', e => {
@@ -5642,7 +5771,7 @@ window.addEventListener('resize', () => {
 
 // Initial render
 // Bumped whenever a build ships so the running version is visible in-app.
-const APP_VERSION = '2026.09.16-cart-mix-details';
+const APP_VERSION = '2026.09.16-cart-mix-entry';
 
 // Reloads bypassing the HTTP cache. GitHub Pages serves max-age=600 and iOS
 // standalone webapps hold on longer still, so the cache-buster is explicit.

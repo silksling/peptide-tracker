@@ -678,55 +678,6 @@ nav::-webkit-scrollbar { display: none; width: 0; height: 0; }
   line-height: 1.5;
 }
 
-.stack-card {
-  padding: 12px 14px;
-  margin-bottom: 14px;
-  background: linear-gradient(135deg, rgba(0,184,148,0.10), rgba(253,203,110,0.10));
-  border: 1px solid rgba(0,184,148,0.35);
-  border-radius: var(--radius-sm);
-}
-
-.stack-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  flex-wrap: wrap;
-  margin-bottom: 8px;
-}
-
-.stack-name { font-size: 13px; font-weight: 700; color: var(--text); }
-
-.stack-toggle {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  color: var(--text-muted);
-  cursor: pointer;
-  margin: 0;
-}
-.stack-toggle input { width: 16px; height: 16px; accent-color: var(--green); margin: 0; }
-
-.stack-why, .stack-caveat, .stack-timing {
-  font-size: 12px;
-  line-height: 1.55;
-  color: var(--text-muted);
-  margin-bottom: 6px;
-}
-.stack-timing { color: var(--text); }
-.stack-caveat { margin-bottom: 0; font-style: italic; }
-
-.cycle-linked {
-  font-size: 10px;
-  font-weight: 600;
-  color: var(--green);
-  padding: 2px 8px;
-  border-radius: 999px;
-  background: rgba(0,184,148,0.15);
-  border: 1px solid rgba(0,184,148,0.4);
-}
-
 .cycle-ev {
   display: inline-block;
   font-size: 9px;
@@ -3075,42 +3026,6 @@ const CYCLE_INFO = {
 // Known synergistic pairings. GHRH analogs and ghrelin-receptor agonists hit
 // separate receptors, so combining them is genuinely additive-to-synergistic
 // rather than redundant.
-const STACKS = {
-  'tesamorelin+ipamorelin': {
-    members: ['tesamorelin', 'ipamorelin'],
-    name: 'Tesamorelin + Ipamorelin',
-    why: 'These work on two different switches in the same axis, which is why they pair well. Tesamorelin is a GHRH analog acting on the GHRH receptor; ipamorelin is a GHS-R1a agonist. Because they bind separate receptors, giving both produces a markedly larger GH pulse than either alone &mdash; a synergy repeatedly demonstrated in humans for the GHRH + GHRP classes since Bowers\' 1990 work in normal men. The mechanism is complementary: the GHRP arm suppresses somatostatin tone (the brake), while the GHRH arm supplies the accelerator.',
-    caveat: 'The synergy is established for the GHRH + GHRP <em>classes</em>, not for this specific blend in a dedicated human trial. Combining also means stacking GH exposure, so IGF-1 monitoring matters more here than on either alone.',
-    timing: 'Both are typically given together at night on an empty stomach, since GH release is largely nocturnal and food blunts the pulse.',
-  },
-};
-
-// Which known stacks the user has linked. Linked members share one cycle
-// window, since running a stack means starting and breaking together.
-function getLinkedStacks() {
-  let saved = {};
-  try { saved = JSON.parse(localStorage.getItem('pt_stacks_' + getActiveProfileId())) || {}; }
-  catch { saved = {}; }
-  return saved;
-}
-
-function saveLinkedStacks(obj) {
-  localStorage.setItem('pt_stacks_' + getActiveProfileId(), JSON.stringify(obj));
-}
-
-function activeStacks() {
-  const tracked = getTrackedPeptides();
-  return Object.entries(STACKS)
-    .filter(([, st]) => st.members.every(m => tracked.includes(m)))
-    .map(([id, st]) => ({ id, ...st }));
-}
-
-// The stack a peptide belongs to, only if that stack is linked.
-function linkedStackOf(pepKey) {
-  const linked = getLinkedStacks();
-  return activeStacks().find(st => linked[st.id] && st.members.includes(pepKey)) || null;
-}
-
 // Per-profile cycle overrides; falls back to the peptide's built-in default.
 function getCycleSettings() {
   try { return JSON.parse(localStorage.getItem('pt_cycles_' + getActiveProfileId())) || {}; }
@@ -3121,14 +3036,14 @@ function saveCycleSettings(obj) {
   localStorage.setItem('pt_cycles_' + getActiveProfileId(), JSON.stringify(obj));
 }
 
-// Applies a window to one peptide, and to the rest of its stack when linked.
+// Each peptide keeps its own window. Tesamorelin has trial data behind runs
+// far longer than anything supporting ipamorelin, and a stack is often only
+// partly running, so cycles are deliberately not tied together.
 function setCycleFor(pepKey, win) {
   const s = getCycleSettings();
-  const stack = linkedStackOf(pepKey);
-  const targets = stack ? stack.members : [pepKey];
-  targets.forEach(k => { s[k] = { onWeeks: win.onWeeks, offWeeks: win.offWeeks }; });
+  s[pepKey] = { onWeeks: win.onWeeks, offWeeks: win.offWeeks };
   saveCycleSettings(s);
-  return targets;
+  return [pepKey];
 }
 
 // Reads a window as text. offWeeks 0 means no scheduled break.
@@ -3221,22 +3136,7 @@ function renderCyclePlanner() {
   }
   if (card) card.style.display = '';
 
-  const linked = getLinkedStacks();
-  const stackHtml = activeStacks().map(st => `
-    <div class="stack-card">
-      <div class="stack-head">
-        <span class="stack-name">${st.name}</span>
-        <label class="stack-toggle">
-          <input type="checkbox" data-stack="${st.id}" ${linked[st.id] ? 'checked' : ''}>
-          <span>Link cycles</span>
-        </label>
-      </div>
-      <p class="stack-why">${st.why}</p>
-      <p class="stack-timing"><strong>Timing:</strong> ${st.timing}</p>
-      <p class="stack-caveat">${st.caveat}</p>
-    </div>`).join('');
-
-  wrap.innerHTML = stackHtml + tracked.map(k => {
+  wrap.innerHTML = tracked.map(k => {
     const p = PEPTIDES[k];
     const info = CYCLE_INFO[k];
     const cur = cycleFor(k);
@@ -3256,12 +3156,10 @@ function renderCyclePlanner() {
     const notes = info.options.map(o =>
       `<li><strong>${o.label} (${o.offWeeks === 0 ? 'continuous' : o.onWeeks + '/' + o.offWeeks})</strong> <span class="cycle-ev${o.evidence === 'Trial-derived' ? ' cycle-ev-trial' : ''}">${o.evidence}</span><br>${o.note}</li>`).join('');
 
-    const st = linkedStackOf(k);
     return `<div class="cycle-block" data-pep="${k}">
       <div class="cycle-block-head">
         <span class="peptide-badge" style="background:${p.color}">${p.name}</span>
         ${cycleStatusHtml(k)}
-        ${st ? `<span class="cycle-linked">linked &middot; ${st.name}</span>` : ''}
       </div>
       <div class="cycle-presets">${presets}</div>
       <div class="cycle-custom">
@@ -3285,20 +3183,6 @@ function renderCyclePlanner() {
       </details>
     </div>`;
   }).join('');
-
-  wrap.querySelectorAll('.stack-toggle input').forEach(cb => {
-    cb.addEventListener('change', () => {
-      const all = getLinkedStacks();
-      all[cb.dataset.stack] = cb.checked;
-      saveLinkedStacks(all);
-      const st = activeStacks().find(x => x.id === cb.dataset.stack);
-      // Linking adopts the first member's window across the stack.
-      if (cb.checked && st) setCycleFor(st.members[0], cycleFor(st.members[0]));
-      renderCyclePlanner();
-      renderPeptideToggles();
-      showToast(cb.checked ? 'Cycles linked' : 'Cycles unlinked');
-    });
-  });
 
   wrap.querySelectorAll('.cycle-preset').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -5771,7 +5655,7 @@ window.addEventListener('resize', () => {
 
 // Initial render
 // Bumped whenever a build ships so the running version is visible in-app.
-const APP_VERSION = '2026.09.16-cart-mix-entry';
+const APP_VERSION = '2026.09.16-no-stack-link';
 
 // Reloads bypassing the HTTP cache. GitHub Pages serves max-age=600 and iOS
 // standalone webapps hold on longer still, so the cache-buster is explicit.

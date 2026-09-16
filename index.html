@@ -309,6 +309,55 @@ nav::-webkit-scrollbar { display: none; width: 0; height: 0; }
   accent-color: var(--accent);
 }
 
+.cart-calc {
+  margin-top: 10px;
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+}
+
+.cart-calc summary {
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  list-style: none;
+  padding: 4px 0;
+}
+
+.cart-calc summary::-webkit-details-marker { display: none; }
+
+.cart-calc summary::before {
+  content: '▸';
+  display: inline-block;
+  margin-right: 6px;
+  transition: transform 0.15s;
+}
+
+.cart-calc[open] summary::before { transform: rotate(90deg); }
+
+.cart-calc-body { padding: 4px 0 2px; }
+
+.cart-calc-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 5px 0;
+  font-size: 11px;
+  border-bottom: 1px solid var(--border);
+}
+
+.cart-calc-row:last-child { border-bottom: none; }
+.cart-calc-row span:first-child { color: var(--text-muted); flex: 0 0 auto; }
+.cart-calc-row span:last-child { font-weight: 600; text-align: right; overflow-wrap: anywhere; }
+
+.cart-calc-note {
+  margin-top: 8px;
+  font-size: 10px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
 .cart-exp {
   display: inline-block;
   margin-top: 6px;
@@ -5073,6 +5122,22 @@ function updateCartridgePlan() {
         conc: parseFloat(btn.dataset.conc),
         peptide: calcState.peptide || DEFAULT_PEPTIDE,
         created: Date.now(),
+        // Snapshot of how this cartridge was mixed. Stored on the cartridge
+        // rather than read live, so later calculator edits cannot rewrite the
+        // record of what actually went in the pen.
+        calc: {
+          peptideAmt: calcState.peptideAmt,
+          bacWater: calcState.bacWater,
+          useFilter: !!calcState.useFilter,
+          filterBaseLoss: calcState.filterBaseLoss,
+          filterRecovery: calcState.filterRecovery,
+          filterLoss: calcState.filterLoss,
+          filterMethod: calcState.filterMethod,
+          micron: (document.getElementById('calc-micron-size') || {}).value || null,
+          diameter: (document.querySelector('#calc-filter-diameter .calc-preset.selected') || {}).dataset
+            ? document.querySelector('#calc-filter-diameter .calc-preset.selected').dataset.val
+            : null,
+        },
       });
       saveCartridges(carts);
       renderCartridges();
@@ -5249,6 +5314,53 @@ function cartridgeSvg(cart) {
   </svg>`;
 }
 
+// Mix details for one cartridge, from the snapshot taken when it was sent
+// over from the calculator. Cartridges added by hand have no snapshot.
+function cartCalcDetailsHtml(c) {
+  const cp = PEPTIDES[c.peptide] || PEPTIDES[DEFAULT_PEPTIDE];
+  const rows = [];
+  const cal = c.calc;
+
+  if (cal) {
+    const totalWater = cal.useFilter && cal.filterMethod === 'extra'
+      ? cal.bacWater + cal.filterLoss
+      : cal.bacWater;
+    rows.push(['Peptide in vial', `${cal.peptideAmt} mg`]);
+    rows.push(['BAC water', `${totalWater} ml${cal.useFilter && cal.filterMethod === 'extra' ? ' (incl. filter make-up)' : ''}`]);
+
+    if (cal.useFilter) {
+      const recovery = cal.filterRecovery === 1 ? 'No purge'
+        : cal.filterRecovery === 0.3 ? 'Air purge'
+        : cal.filterRecovery === 0.15 ? 'Air + water chase'
+        : `${Math.round((1 - cal.filterRecovery) * 100)}% recovered`;
+      const lostMg = totalWater > 0 ? (cal.filterLoss / totalWater) * cal.peptideAmt : 0;
+      rows.push(['PES filter', `${cal.diameter ? cal.diameter + ' mm' : 'used'}${cal.micron ? ' &middot; ' + cal.micron + ' &micro;m' : ''}`]);
+      rows.push(['Recovery method', recovery]);
+      rows.push(['Filter loss', `${cal.filterLoss.toFixed(2)} ml (~${lostMg.toFixed(2)} mg)`]);
+      rows.push(['Handling', cal.filterMethod === 'extra' ? 'Added extra water' : 'Reduced usable volume']);
+    } else {
+      rows.push(['PES filter', 'Not used']);
+    }
+  }
+
+  rows.push(['Concentration', `${c.conc} mg/ml`]);
+  rows.push(['Volume', `${c.remaining.toFixed(2)} ml left of ${c.capacity} ml capacity`]);
+  if (c.created) {
+    rows.push(['Mixed', new Date(c.created).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })]);
+  }
+
+  const body = rows.map(([l, v]) =>
+    `<div class="cart-calc-row"><span>${l}</span><span>${v}</span></div>`).join('');
+
+  return `<details class="cart-calc">
+    <summary>${cal ? 'Mix details' : 'Details'}${cal && cal.useFilter ? ` &middot; ${cal.diameter || ''}mm filter` : ''}</summary>
+    <div class="cart-calc-body">
+      ${body}
+      ${cal ? '' : '<p class="cart-calc-note">Added by hand, so there is no calculator record of how it was mixed. Sending one over from the Calc tab captures its filter and reconstitution settings.</p>'}
+    </div>
+  </details>`;
+}
+
 function renderCartridges() {
   const listEl = document.getElementById('cart-list');
   if (!listEl) return;
@@ -5280,7 +5392,7 @@ function renderCartridges() {
         <button class="cart-del" data-act="del" title="Delete">&times;</button>
       </div>
       <div class="cart-scale-wrap">${cartridgeSvg(c)}</div>
-      <div class="cart-scale-note">Shown at actual size &middot; ${c.capacity} ml cartridge &middot; ${pct.toFixed(0)}% full</div>
+      <div class="cart-scale-note">Shown at actual size &middot; ${c.capacity} ml cartridge &middot; <strong>${c.remaining.toFixed(2)} of ${c.capacity} ml left</strong> &middot; ${pct.toFixed(0)}% full</div>
       ${cartExpiryHtml(c)}
       <input type="range" class="cart-slider" data-act="slider" min="0" max="${c.capacity}" step="0.01" value="${c.remaining}">
       <div class="cart-dose-row">
@@ -5304,6 +5416,7 @@ function renderCartridges() {
           ? `A ${doseAmt}${cp.unit} shot needs ${(perShot * UNITS_PER_ML).toFixed(0)}u, more than this cartridge holds`
           : `${c.conc} mg/ml &middot; dose ${(doseMl * UNITS_PER_ML).toFixed(0)}u + ${set.primeUnits}u prime = ${(perShot * UNITS_PER_ML).toFixed(0)}u per shot`}
       </div>
+      ${cartCalcDetailsHtml(c)}
     </div>`;
   }).join('');
 }
@@ -5529,7 +5642,7 @@ window.addEventListener('resize', () => {
 
 // Initial render
 // Bumped whenever a build ships so the running version is visible in-app.
-const APP_VERSION = '2026.09.16-ipa-titration';
+const APP_VERSION = '2026.09.16-cart-mix-details';
 
 // Reloads bypassing the HTTP cache. GitHub Pages serves max-age=600 and iOS
 // standalone webapps hold on longer still, so the cache-buster is explicit.

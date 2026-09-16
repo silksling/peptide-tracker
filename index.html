@@ -5244,6 +5244,44 @@ function cartridgeSvg(cart) {
   </svg>`;
 }
 
+// Works backwards from the dose log to what a cartridge held before its first
+// dose. Doses logged since auto-deduct carry the exact volume they drew;
+// earlier ones of the same peptide are estimated from this cartridge's
+// concentration. Standalone Prime and Inject taps wrote nothing to the log, so
+// they cannot be recovered and the result is a floor, not a measurement.
+function cartOriginalVolume(c) {
+  if (!(c.conc > 0)) return null;
+  const primeMl = getCartSettings().primeUnits / UNITS_PER_ML;
+  const cp = PEPTIDES[c.peptide] || PEPTIDES[DEFAULT_PEPTIDE];
+
+  let exactMl = 0, exactCount = 0;
+  let estMl = 0, estCount = 0;
+
+  getDoses().forEach(d => {
+    if (d.cartridgeId === c.id && d.mlUsed) {
+      exactMl += d.mlUsed;
+      exactCount++;
+      return;
+    }
+    // Unlinked dose of the same peptide, on or after this cartridge was mixed.
+    if (d.cartridgeId) return;
+    if (peptideKeyOf(d) !== (c.peptide || DEFAULT_PEPTIDE)) return;
+    if (c.created && doseTimestamp(d) < c.created) return;
+    const mg = cp.unit === 'mcg' ? d.amount / 1000 : d.amount;
+    estMl += mg / c.conc + primeMl;
+    estCount++;
+  });
+
+  if (!exactCount && !estCount) return null;
+  const original = c.remaining + exactMl + estMl;
+  return {
+    original,
+    exactMl, exactCount,
+    estMl, estCount,
+    overCapacity: original > c.capacity + 1e-6,
+  };
+}
+
 // Holdup volume by filter diameter, matching the calculator's presets.
 const FILTER_BASE_LOSS = { 4: 0.05, 13: 0.28, 25: 0.55, 33: 1.0 };
 const RECOVERY_FACTORS = { '1': 'No purge', '0.3': 'Air purge', '0.15': 'Air + water chase' };
@@ -5316,6 +5354,18 @@ function cartCalcDetailsHtml(c) {
 
   rows.push(['Concentration', `${c.conc} mg/ml`]);
   rows.push(['Volume', `${c.remaining.toFixed(2)} ml left of ${c.capacity} ml capacity`]);
+
+  const back = cartOriginalVolume(c);
+  if (back) {
+    const parts = [];
+    if (back.exactCount) parts.push(`${back.exactCount} logged dose${back.exactCount === 1 ? '' : 's'} at ${back.exactMl.toFixed(2)} ml`);
+    if (back.estCount) parts.push(`${back.estCount} earlier dose${back.estCount === 1 ? '' : 's'} estimated at ${back.estMl.toFixed(2)} ml`);
+    rows.push([
+      back.estCount ? 'Fill before first dose (est.)' : 'Fill before first dose',
+      `${back.original.toFixed(2)} ml`,
+    ]);
+    rows.push(['Worked back from', parts.join(' + ')]);
+  }
   if (c.created) {
     rows.push(['Mixed', new Date(c.created).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })]);
   }
@@ -5327,6 +5377,9 @@ function cartCalcDetailsHtml(c) {
     <summary>${cal ? 'Mix details' : 'Details'}${cal && cal.useFilter ? ` &middot; ${cal.diameter || ''}mm filter` : ''}${cal && cal.enteredManually ? ' &middot; entered by you' : ''}</summary>
     <div class="cart-calc-body">
       ${body}
+      ${back ? `<p class="cart-calc-note">${back.overCapacity
+        ? `That is more than the ${c.capacity} ml this cartridge holds, so it was almost certainly refilled, or volume came off via the Inject and Prime buttons, which do not write to the dose log.`
+        : 'Counts logged doses only. Taps on Inject or Prime change the volume without logging a dose, so the real fill may have been higher.'}</p>` : ''}
       ${cal ? '' : cartCalcFormHtml(c)}
     </div>
   </details>`;
@@ -5655,7 +5708,7 @@ window.addEventListener('resize', () => {
 
 // Initial render
 // Bumped whenever a build ships so the running version is visible in-app.
-const APP_VERSION = '2026.09.16-no-stack-link';
+const APP_VERSION = '2026.09.16-fill-from-log';
 
 // Reloads bypassing the HTTP cache. GitHub Pages serves max-age=600 and iOS
 // standalone webapps hold on longer still, so the cache-buster is explicit.

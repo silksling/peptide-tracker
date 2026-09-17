@@ -2987,7 +2987,7 @@ document.querySelectorAll('.nav-btn').forEach(btn => {
     document.getElementById(`view-${btn.dataset.view}`).classList.add('active');
     if (btn.dataset.view === 'dashboard') renderDashboard();
     if (btn.dataset.view === 'weight') renderWeightHistory();
-    if (btn.dataset.view === 'doses') renderDoseHistory();
+    if (btn.dataset.view === 'doses') { resetDoseFormDateTime(); renderDoseHistory(); }
     if (btn.dataset.view === 'levels') renderLevels();
     if (btn.dataset.view === 'calc') updateCalc();
     if (btn.dataset.view === 'protocol') renderProtocol();
@@ -3051,8 +3051,16 @@ function updateSiteSuggestion() {
 }
 
 // Dose form
-document.getElementById('dose-date').value = todayStr();
-document.getElementById('dose-time').value = new Date().toTimeString().slice(0, 5);
+// Set once at load, the time field goes stale -- an app left open all day
+// still offers the moment it was opened. Refreshed on entering the tab and
+// after each log instead.
+function resetDoseFormDateTime() {
+  const now = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  document.getElementById('dose-date').value = localDateStr(now);
+  document.getElementById('dose-time').value = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+}
+resetDoseFormDateTime();
 updateSiteSuggestion();
 
 function populatePeptideSelect() {
@@ -3122,6 +3130,7 @@ document.getElementById('dose-form').addEventListener('submit', e => {
   document.getElementById('dose-amount-custom').value = '';
   document.getElementById('dose-site').value = '';
   document.getElementById('dose-notes').value = '';
+  resetDoseFormDateTime();
   document.querySelectorAll('.side-effect-chip.selected').forEach(c => c.classList.remove('selected'));
 
   const base = `${PEPTIDES[peptide].name} logged: ${formatDoseAmount(amount, peptide)}`;
@@ -5899,13 +5908,15 @@ document.getElementById('cart-list').addEventListener('click', e => {
   // Injecting asks where, then writes a dose entry as well as taking the
   // volume -- otherwise this button and the dose log drift apart.
   const doseAmt = cartDoseAmt(c);
+  // Stamped before the prompt opens, so the dose records when the shot was
+  // taken rather than however long it took to answer where.
+  const injectedAt = new Date();
   showSitePicker(`${doseAmt}${cp.unit} from ${c.label}`).then(site => {
     if (!site) return;
-    const now = new Date();
     const pad = n => String(n).padStart(2, '0');
     const entry = {
-      date: `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`,
-      time: `${pad(now.getHours())}:${pad(now.getMinutes())}`,
+      date: `${injectedAt.getFullYear()}-${pad(injectedAt.getMonth() + 1)}-${pad(injectedAt.getDate())}`,
+      time: `${pad(injectedAt.getHours())}:${pad(injectedAt.getMinutes())}`,
       amount: doseAmt,
       peptide: c.peptide || DEFAULT_PEPTIDE,
       site,
@@ -6051,7 +6062,7 @@ window.addEventListener('resize', () => {
 
 // Initial render
 // Bumped whenever a build ships so the running version is visible in-app.
-const APP_VERSION = '2026.09.16-collapse-protocol';
+const APP_VERSION = '2026.09.16-dose-timestamps';
 
 // Reloads bypassing the HTTP cache. GitHub Pages serves max-age=600 and iOS
 // standalone webapps hold on longer still, so the cache-buster is explicit.

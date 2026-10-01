@@ -237,16 +237,16 @@ nav::-webkit-scrollbar { display: none; width: 0; height: 0; }
 .chart-scroll {
   width: 100%;
   max-width: 100%;
-  overflow-x: auto;
-  overflow-y: hidden;
-  -webkit-overflow-scrolling: touch;
-  overscroll-behavior-x: contain;
+  overflow: hidden;
 }
 
+/* pan-y keeps vertical page scrolling native while horizontal drags reach
+   the scrubber; with pan-x the browser and the scrubber fought over them. */
 .chart-scroll canvas {
   display: block;
+  max-width: 100%;
   height: 220px;
-  touch-action: pan-x;
+  touch-action: pan-y;
 }
 
 /* At-scale cartridge visual: real 3ml pen cartridges are ~64mm x 9.5mm */
@@ -3935,21 +3935,16 @@ function weightSeriesStats(weights) {
   return { slope, goal, lastVal, projDays, dataDays, times, values };
 }
 
-// Widen the canvas so dose pills keep full size; the wrapper scrolls.
+// The chart always fits its card. Widening it per entry pushed long ranges
+// thousands of pixels off screen; dense ranges thin their dose pills instead.
 function sizeWeightCanvas() {
   const canvas = document.getElementById('weight-chart');
   const wrap = canvas.parentElement;
-  let n = 0;
-  try {
-    n = Math.max(0, visibleWeights().length - 1);
-  } catch { n = 0; }
-  // Measure the container, not the scroll wrapper: the wrapper's own width
-  // depends on the canvas we're about to size.
+  // Measure the card, not the wrapper, whose width follows the canvas.
   const host = wrap.parentElement || wrap;
   const cs = getComputedStyle(host);
   const avail = Math.max(240, host.clientWidth - parseFloat(cs.paddingLeft || 0) - parseFloat(cs.paddingRight || 0));
-  const needed = 64 + n * 52;
-  canvas.style.width = Math.max(avail, needed) + 'px';
+  canvas.style.width = avail + 'px';
 }
 
 function drawChart() {
@@ -4037,6 +4032,10 @@ function drawChart() {
   ctx.strokeStyle = '#2e3140';
   ctx.lineWidth = 1;
   const gridLines = 5;
+  // Whole pounds collapse a narrow range -- a week spanning under a pound
+  // labelled every line 227. Use a decimal once lines sit under 1 lb apart.
+  const yStep = (yMax - yMin) / gridLines;
+  const yDecimals = yStep < 1 ? 1 : 0;
   for (let i = 0; i <= gridLines; i++) {
     const y = pad.top + (i / gridLines) * chartH;
     ctx.beginPath();
@@ -4048,7 +4047,7 @@ function drawChart() {
     ctx.fillStyle = '#8b8d98';
     ctx.font = '11px -apple-system, sans-serif';
     ctx.textAlign = 'right';
-    ctx.fillText(val.toFixed(0), pad.left - 8, y + 4);
+    ctx.fillText(val.toFixed(yDecimals), pad.left - 8, y + 4);
   }
 
   // X labels
@@ -4116,16 +4115,26 @@ function drawChart() {
   });
   ctx.lineCap = 'butt';
 
-  // Dots
+  // Dots shrink as entries crowd together; at full size two months of daily
+  // weigh-ins overlap into a chain. Once too dense to read individually they
+  // become small solid points so the line stays legible.
+  const spacing = values.length > 1 ? chartW / (values.length - 1) : chartW;
+  const dense = spacing < 6;
+  const dotR = Math.max(1.6, Math.min(3.5, spacing / 2.6));
   for (let i = 0; i < values.length; i++) {
     const amt = doseAt(new Date(weights[i].date + 'T23:59:59').getTime());
     ctx.beginPath();
-    ctx.arc(xScale(i), yScale(values[i]), 3.5, 0, Math.PI * 2);
-    ctx.fillStyle = '#0f1117';
-    ctx.fill();
-    ctx.strokeStyle = doseColor(amt);
-    ctx.lineWidth = 2.5;
-    ctx.stroke();
+    ctx.arc(xScale(i), yScale(values[i]), dotR, 0, Math.PI * 2);
+    if (dense) {
+      ctx.fillStyle = doseColor(amt);
+      ctx.fill();
+    } else {
+      ctx.fillStyle = '#0f1117';
+      ctx.fill();
+      ctx.strokeStyle = doseColor(amt);
+      ctx.lineWidth = Math.min(2.5, dotR * 0.75);
+      ctx.stroke();
+    }
   }
 
   // Dose pills, placed above each segment and nudged up to avoid collisions
@@ -4135,25 +4144,35 @@ function drawChart() {
   const placed = [];
   const pillH = 17;
 
-  segments.forEach(seg => {
+  // On a fitted chart a long range can't fit a pill per segment. Where the
+  // dose changes is what matters, so those are placed first and may stack
+  // one level; repeats of the same dose only show where they fit unstacked.
+  const unit = PEPTIDES[weightPepKey].unit;
+  const ordered = segments
+    .map((seg, k) => ({ ...seg, isChange: seg.amt != null && (k === 0 || segments[k - 1].amt !== seg.amt) }))
+    .sort((a, b) => (b.isChange - a.isChange) || (a.i - b.i));
+
+  ordered.forEach(seg => {
     if (seg.amt == null) return;
-    const text = `${seg.amt}${PEPTIDES[weightPepKey].unit}`;
+    const text = `${seg.amt}${unit}`;
     const w = ctx.measureText(text).width + 14;
     const x0 = xScale(seg.i - 1), x1 = xScale(seg.i);
-    let cx = (x0 + x1) / 2;
+    if (!seg.isChange && x1 - x0 < w + 6) return;
+
+    let cx = seg.isChange ? x0 + w / 2 : (x0 + x1) / 2;
     cx = Math.max(pad.left + w / 2, Math.min(width - pad.right - w / 2, cx));
 
     const segTopY = Math.min(yScale(values[seg.i - 1]), yScale(values[seg.i]));
     let cy = segTopY - 14;
 
-    // Walk upward until this pill clears the ones already placed
-    for (let guard = 0; guard < 40; guard++) {
-      const clash = placed.some(p =>
-        Math.abs(p.cx - cx) < (p.w + w) / 2 + 3 && Math.abs(p.cy - cy) < pillH + 2);
-      if (!clash) break;
+    const clashes = y => placed.some(p =>
+      Math.abs(p.cx - cx) < (p.w + w) / 2 + 3 && Math.abs(p.cy - y) < pillH + 2);
+    let levels = seg.isChange ? 1 : 0;
+    while (levels > 0 && clashes(cy)) {
       cy -= pillH + 3;
+      levels--;
     }
-    if (cy < pad.top - 6) return;
+    if (clashes(cy) || cy < pad.top - 6) return;
     placed.push({ cx, cy, w });
 
     const r = pillH / 2;
@@ -6062,7 +6081,7 @@ window.addEventListener('resize', () => {
 
 // Initial render
 // Bumped whenever a build ships so the running version is visible in-app.
-const APP_VERSION = '2026.09.16-dose-timestamps';
+const APP_VERSION = '2026.10.01-weight-chart-fit';
 
 // Reloads bypassing the HTTP cache. GitHub Pages serves max-age=600 and iOS
 // standalone webapps hold on longer still, so the cache-buster is explicit.

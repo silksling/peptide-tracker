@@ -2206,8 +2206,11 @@ nav::-webkit-scrollbar { display: none; width: 0; height: 0; }
             </div>
             <div class="form-group">
               <label for="dose-amount"><span id="dose-amount-label">Dose (mg)</span></label>
-              <select id="dose-amount" required></select>
-              <input type="number" id="dose-amount-custom" step="0.01" min="0" placeholder="Or enter custom amount" style="margin-top:8px;">
+              <!-- Not "required": typing a custom amount clears this, and the
+                   browser would then block the submit before it reached the
+                   handler, which checks that one of the two holds a dose. -->
+              <select id="dose-amount"></select>
+              <input type="number" inputmode="decimal" id="dose-amount-custom" step="any" min="0" placeholder="Or enter custom amount" style="margin-top:8px;">
             </div>
             <div class="form-group">
               <label for="dose-site">Injection Site</label>
@@ -2414,7 +2417,7 @@ nav::-webkit-scrollbar { display: none; width: 0; height: 0; }
               <button class="calc-preset" data-val="8">8 mg</button>
               <button class="calc-preset" data-val="12">12 mg</button>
             </div>
-            <input type="number" id="calc-dose-custom" step="0.1" min="0.1" max="100" placeholder="Or enter custom (mg)">
+            <input type="number" inputmode="decimal" id="calc-dose-custom" step="any" min="0" placeholder="Or enter custom (mg)">
           </div>
         </div>
 
@@ -3107,7 +3110,8 @@ document.getElementById('dose-form').addEventListener('submit', e => {
   const peptide = document.getElementById('dose-peptide').value || DEFAULT_PEPTIDE;
   const site = document.getElementById('dose-site').value;
   const notes = document.getElementById('dose-notes').value.trim();
-  if (!date || isNaN(amount) || amount <= 0) return;
+  if (!date) { showToast('Pick a date', 'error'); return; }
+  if (isNaN(amount) || amount <= 0) { showToast('Choose a dose or type a custom amount', 'error'); return; }
 
   const sideEffects = [...document.querySelectorAll('.side-effect-chip.selected')].map(c => c.dataset.effect);
 
@@ -4528,8 +4532,9 @@ function saveTrackedPeptides(list) {
 
 function formatDoseAmount(amount, pepKey) {
   const p = PEPTIDES[pepKey] || PEPTIDES[DEFAULT_PEPTIDE];
-  const n = Number(amount);
-  const str = Number.isInteger(n) ? String(n) : n.toFixed(2).replace(/0$/, '');
+  // Up to three decimals with trailing zeros dropped, so a typed 1.555 reads
+  // back as entered rather than rounded to 1.55.
+  const str = String(parseFloat(Number(amount).toFixed(3)));
   return `${str} ${p.unit}`;
 }
 
@@ -6081,7 +6086,7 @@ window.addEventListener('resize', () => {
 
 // Initial render
 // Bumped whenever a build ships so the running version is visible in-app.
-const APP_VERSION = '2026.10.01-weight-chart-fit';
+const APP_VERSION = '2026.10.15-custom-dose-fix';
 
 // Reloads bypassing the HTTP cache. GitHub Pages serves max-age=600 and iOS
 // standalone webapps hold on longer still, so the cache-buster is explicit.

@@ -396,6 +396,33 @@ nav::-webkit-scrollbar { display: none; width: 0; height: 0; }
   color: var(--accent);
 }
 
+.cart-fill-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 8px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.cart-fill-row em { display: block; font-style: normal; font-size: 10px; opacity: 0.8; }
+
+.cart-fill-row input {
+  flex: 0 0 96px;
+  width: 96px;
+  padding: 8px 10px;
+  font-size: 16px;
+  min-height: 42px;
+  text-align: right;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  -webkit-appearance: none;
+  appearance: none;
+}
+
 .cart-calc-form { margin-top: 6px; }
 
 .cart-calc-form label {
@@ -3594,11 +3621,11 @@ function renderDoseHistory() {
       save(STORAGE_KEYS.doses, doses);
       // Hand back whatever this dose drew, so deleting a mistake does not
       // leave the cartridge short.
-      revertDoseFromCartridge(removed);
+      const refunded = revertDoseFromCartridge(removed);
       renderDoseHistory();
       renderCartridges();
       renderDashboard();
-      const back = removed && removed.mlUsed
+      const back = refunded
         ? ` - ${(removed.mlUsed * UNITS_PER_ML).toFixed(0)}u returned`
         : '';
       showToast('Entry deleted' + back);
@@ -5422,11 +5449,14 @@ function updateCartridgePlan() {
         label: `Cartridge ${String.fromCharCode(65 + carts.length)}`,
         capacity: parseFloat(btn.dataset.cap),
         remaining: parseFloat(btn.dataset.ml),
+        // What Refill returns to.
+        filledMl: parseFloat(btn.dataset.ml),
         conc: parseFloat(btn.dataset.conc),
         peptide: calcState.peptide || DEFAULT_PEPTIDE,
         // The dose this mix was calculated around, so the cartridge opens on
-        // the right injection amount without consulting a global default.
-        doseAmt: calcState.dose,
+        // the right injection amount. calcState holds mg; cartridges hold the
+        // peptide's own unit.
+        doseAmt: parseFloat((calcState.dose / calcUnitFactor(calcState.peptide || DEFAULT_PEPTIDE)).toFixed(3)),
         created: Date.now(),
         // Snapshot of how this cartridge was mixed. Stored on the cartridge
         // rather than read live, so later calculator edits cannot rewrite the
@@ -5517,8 +5547,32 @@ function cartExpiryHtml(cart) {
 // Older cartridges without one fall back to that peptide's first dose preset.
 function cartDoseAmt(cart) {
   const p = PEPTIDES[cart.peptide] || PEPTIDES[DEFAULT_PEPTIDE];
-  if (cart.doseAmt != null && !isNaN(cart.doseAmt)) return cart.doseAmt;
+  if (cart.doseAmt != null && !isNaN(cart.doseAmt)) {
+    // Cartridges sent from the calculator briefly stored mcg peptides in mg,
+    // so 300 mcg arrived as 0.3. No real mcg dose here is under 1.
+    if (p.unit === 'mcg' && cart.doseAmt > 0 && cart.doseAmt < 1) {
+      return parseFloat((cart.doseAmt * 1000).toFixed(3));
+    }
+    return cart.doseAmt;
+  }
   return p.doses[0] || 0;
+}
+
+// The volume Refill returns a cartridge to. Newer cartridges record it when
+// sent from the calculator. Older ones never did, so fall back to what their
+// mix implies, then to what the dose log adds up to, then to full.
+function cartFillLevel(c) {
+  if (c.filledMl > 0) return { ml: c.filledMl, source: 'recorded' };
+  const cal = c.calc;
+  if (cal && cal.bacWater > 0) {
+    const usable = cal.useFilter && cal.filterMethod !== 'extra'
+      ? cal.bacWater - (cal.filterLoss || 0)
+      : cal.bacWater;
+    if (usable > 0) return { ml: Math.min(c.capacity, usable), source: 'estimated from mix' };
+  }
+  const back = cartOriginalVolume(c);
+  if (back) return { ml: Math.min(c.capacity, back.original), source: 'estimated from dose log' };
+  return { ml: c.capacity, source: 'full cartridge' };
 }
 
 // Concentration is always stored mg/ml, so mcg-dosed peptides convert down.
@@ -5573,12 +5627,17 @@ function applyDoseToCartridge(dose) {
 // Undoes the deduction a dose made, using the volume recorded at log time so
 // a later concentration or priming change cannot skew the refund.
 function revertDoseFromCartridge(dose) {
-  if (!dose || !dose.cartridgeId || !dose.mlUsed) return;
+  if (!dose || !dose.cartridgeId || !dose.mlUsed) return false;
   const carts = getCartridges();
   const target = carts.find(c => c.id === dose.cartridgeId);
-  if (!target) return;
+  if (!target) return false;
+  // A dose logged before the last refill came out of the previous fill, so
+  // deleting it must not top up the fresh one. Dose ids are the real time the
+  // entry was made, unlike the dose's editable date.
+  if (target.refilledAt && Number(dose.id) < target.refilledAt) return false;
   target.remaining = Math.min(target.capacity, target.remaining + dose.mlUsed);
   saveCartridges(carts);
+  return true;
 }
 
 // Draws a to-scale cartridge. Real 3ml pen cartridges are ~64mm long,
@@ -5729,7 +5788,9 @@ function cartCalcDetailsHtml(c) {
   rows.push(['Concentration', `${c.conc} mg/ml`]);
   rows.push(['Volume', `${c.remaining.toFixed(2)} ml left of ${c.capacity} ml capacity`]);
 
-  const back = cartOriginalVolume(c);
+  // Only worth working out when the fill was never recorded. After a refill
+  // the log also holds doses from the previous fill, which would inflate it.
+  const back = c.filledMl > 0 ? null : cartOriginalVolume(c);
   if (back) {
     const parts = [];
     if (back.exactCount) parts.push(`${back.exactCount} logged dose${back.exactCount === 1 ? '' : 's'} at ${back.exactMl.toFixed(2)} ml`);
@@ -5741,16 +5802,23 @@ function cartCalcDetailsHtml(c) {
     rows.push(['Worked back from', parts.join(' + ')]);
   }
   if (c.created) {
-    rows.push(['Mixed', new Date(c.created).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })]);
+    rows.push([c.refilledAt ? 'Refilled' : 'Mixed', new Date(c.created).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })]);
   }
 
   const body = rows.map(([l, v]) =>
     `<div class="cart-calc-row"><span>${l}</span><span>${v}</span></div>`).join('');
 
+  const fill = cartFillLevel(c);
+  const fillHtml = `<label class="cart-fill-row">
+      <span>Refill level (ml) <em>${fill.source}</em></span>
+      <input type="number" inputmode="decimal" data-act="fill" step="any" min="0" max="${c.capacity}" value="${parseFloat(fill.ml.toFixed(3))}">
+    </label>`;
+
   return `<details class="cart-calc">
     <summary>${cal ? 'Mix details' : 'Details'}${cal && cal.useFilter ? ` &middot; ${cal.diameter || ''}mm filter` : ''}${cal && cal.enteredManually ? ' &middot; entered by you' : ''}</summary>
     <div class="cart-calc-body">
       ${body}
+      ${fillHtml}
       ${back ? `<p class="cart-calc-note">${back.overCapacity
         ? `That is more than the ${c.capacity} ml this cartridge holds, so it was almost certainly refilled, or volume came off via the Inject and Prime buttons, which do not write to the dose log.`
         : 'Counts logged doses only. Taps on Inject or Prime change the volume without logging a dose, so the real fill may have been higher.'}</p>` : ''}
@@ -5807,7 +5875,7 @@ function renderCartridges() {
       <div class="cart-actions">
         <button class="btn-primary" data-act="inject">Inject ${doseAmt}${cp.unit}</button>
         <button class="btn-secondary" data-act="prime">Prime ${set.primeUnits}u</button>
-        <button class="btn-secondary" data-act="refill">Refill</button>
+        <button class="btn-secondary" data-act="refill">Refill ${parseFloat(cartFillLevel(c).ml.toFixed(2))}ml</button>
       </div>
       <div style="font-size:11px;color:${tooBig ? 'var(--red)' : 'var(--text-muted)'};margin-top:8px;">
         ${tooBig
@@ -5905,8 +5973,31 @@ document.getElementById('cart-list').addEventListener('click', e => {
     return;
   }
   if (act === 'refill') {
-    updateCartridge(id, c => { c.remaining = c.capacity; });
-    showToast('Refilled to full');
+    const cart = getCartridges().find(x => x.id === id);
+    if (!cart) return;
+    const prev = { remaining: cart.remaining, created: cart.created, filledMl: cart.filledMl, refilledAt: cart.refilledAt };
+    const ml = cartFillLevel(cart).ml;
+    const now = Date.now();
+    // Same mix, concentration and injection amount; only the volume and the
+    // shelf-life clock start over. Oldest-first auto-deduct now treats it as
+    // the newest cartridge too.
+    updateCartridge(id, x => {
+      x.remaining = ml;
+      x.filledMl = ml;
+      x.created = now;
+      x.refilledAt = now;
+    });
+    const refilled = getCartridges().find(x => x.id === id);
+    const exp = cartExpiry(refilled);
+    const toss = new Date(exp.expiresMs).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    // One tap now replaces the volume and the dates, so it can be taken back.
+    showToast(`Refilled to ${parseFloat(ml.toFixed(2))} ml - toss ${toss}`, 'success', {
+      label: 'Undo',
+      onClick: () => {
+        updateCartridge(id, x => { Object.assign(x, prev); });
+        showToast('Refill undone');
+      },
+    });
     return;
   }
 
@@ -5964,6 +6055,28 @@ document.getElementById('cart-list').addEventListener('click', e => {
     renderDashboard();
     showToast(`Injected ${doseAmt}${cp.unit} into ${SITE_LABELS[site]} (+${set.primeUnits}u prime)`);
   });
+});
+
+// Sets what Refill returns to, mainly for older cartridges whose fill was
+// never recorded. Patched in place so saving doesn't collapse the dropdown.
+document.getElementById('cart-list').addEventListener('change', e => {
+  const input = e.target.closest('[data-act="fill"]');
+  if (!input) return;
+  const card = input.closest('.cart-card');
+  const carts = getCartridges();
+  const c = carts.find(x => x.id === card.dataset.id);
+  if (!c) return;
+  const v = parseFloat(input.value);
+  if (isNaN(v) || v <= 0 || v > c.capacity) {
+    showToast(`Enter a level up to ${c.capacity} ml`, 'error');
+    input.value = parseFloat(cartFillLevel(c).ml.toFixed(3));
+    return;
+  }
+  c.filledMl = v;
+  saveCartridges(carts);
+  card.querySelector('[data-act="refill"]').textContent = `Refill ${parseFloat(v.toFixed(2))}ml`;
+  card.querySelector('.cart-fill-row em').textContent = 'recorded';
+  showToast(`Refill level set to ${parseFloat(v.toFixed(2))} ml`);
 });
 
 document.getElementById('cart-list').addEventListener('input', e => {
@@ -6086,7 +6199,7 @@ window.addEventListener('resize', () => {
 
 // Initial render
 // Bumped whenever a build ships so the running version is visible in-app.
-const APP_VERSION = '2026.10.15-custom-dose-fix';
+const APP_VERSION = '2026.11.06-refill-same-specs';
 
 // Reloads bypassing the HTTP cache. GitHub Pages serves max-age=600 and iOS
 // standalone webapps hold on longer still, so the cache-buster is explicit.

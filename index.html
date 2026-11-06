@@ -396,33 +396,6 @@ nav::-webkit-scrollbar { display: none; width: 0; height: 0; }
   color: var(--accent);
 }
 
-.cart-fill-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-top: 8px;
-  font-size: 11px;
-  color: var(--text-muted);
-}
-
-.cart-fill-row em { display: block; font-style: normal; font-size: 10px; opacity: 0.8; }
-
-.cart-fill-row input {
-  flex: 0 0 96px;
-  width: 96px;
-  padding: 8px 10px;
-  font-size: 16px;
-  min-height: 42px;
-  text-align: right;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  color: var(--text);
-  -webkit-appearance: none;
-  appearance: none;
-}
-
 .cart-calc-form { margin-top: 6px; }
 
 .cart-calc-form label {
@@ -5790,7 +5763,7 @@ function cartCalcDetailsHtml(c) {
 
   // Only worth working out when the fill was never recorded. After a refill
   // the log also holds doses from the previous fill, which would inflate it.
-  const back = c.filledMl > 0 ? null : cartOriginalVolume(c);
+  const back = c.filledMl > 0 || c.refilledAt ? null : cartOriginalVolume(c);
   if (back) {
     const parts = [];
     if (back.exactCount) parts.push(`${back.exactCount} logged dose${back.exactCount === 1 ? '' : 's'} at ${back.exactMl.toFixed(2)} ml`);
@@ -5808,17 +5781,10 @@ function cartCalcDetailsHtml(c) {
   const body = rows.map(([l, v]) =>
     `<div class="cart-calc-row"><span>${l}</span><span>${v}</span></div>`).join('');
 
-  const fill = cartFillLevel(c);
-  const fillHtml = `<label class="cart-fill-row">
-      <span>Refill level (ml) <em>${fill.source}</em></span>
-      <input type="number" inputmode="decimal" data-act="fill" step="any" min="0" max="${c.capacity}" value="${parseFloat(fill.ml.toFixed(3))}">
-    </label>`;
-
   return `<details class="cart-calc">
     <summary>${cal ? 'Mix details' : 'Details'}${cal && cal.useFilter ? ` &middot; ${cal.diameter || ''}mm filter` : ''}${cal && cal.enteredManually ? ' &middot; entered by you' : ''}</summary>
     <div class="cart-calc-body">
       ${body}
-      ${fillHtml}
       ${back ? `<p class="cart-calc-note">${back.overCapacity
         ? `That is more than the ${c.capacity} ml this cartridge holds, so it was almost certainly refilled, or volume came off via the Inject and Prime buttons, which do not write to the dose log.`
         : 'Counts logged doses only. Taps on Inject or Prime change the volume without logging a dose, so the real fill may have been higher.'}</p>` : ''}
@@ -5928,6 +5894,9 @@ document.getElementById('cart-list').addEventListener('click', e => {
   const base = useFilter ? (FILTER_BASE_LOSS[diameter] || 0) : 0;
 
   updateCartridge(form.dataset.id, c => {
+    // A fill saved by an earlier refill was only an estimate; the entered mix
+    // replaces it, so the next Refill goes to what this mix produces.
+    delete c.filledMl;
     c.calc = {
       peptideAmt, bacWater, useFilter,
       filterBaseLoss: base,
@@ -6057,28 +6026,6 @@ document.getElementById('cart-list').addEventListener('click', e => {
   });
 });
 
-// Sets what Refill returns to, mainly for older cartridges whose fill was
-// never recorded. Patched in place so saving doesn't collapse the dropdown.
-document.getElementById('cart-list').addEventListener('change', e => {
-  const input = e.target.closest('[data-act="fill"]');
-  if (!input) return;
-  const card = input.closest('.cart-card');
-  const carts = getCartridges();
-  const c = carts.find(x => x.id === card.dataset.id);
-  if (!c) return;
-  const v = parseFloat(input.value);
-  if (isNaN(v) || v <= 0 || v > c.capacity) {
-    showToast(`Enter a level up to ${c.capacity} ml`, 'error');
-    input.value = parseFloat(cartFillLevel(c).ml.toFixed(3));
-    return;
-  }
-  c.filledMl = v;
-  saveCartridges(carts);
-  card.querySelector('[data-act="refill"]').textContent = `Refill ${parseFloat(v.toFixed(2))}ml`;
-  card.querySelector('.cart-fill-row em').textContent = 'recorded';
-  showToast(`Refill level set to ${parseFloat(v.toFixed(2))} ml`);
-});
-
 document.getElementById('cart-list').addEventListener('input', e => {
   const slider = e.target.closest('[data-act="slider"]');
   if (slider) {
@@ -6199,7 +6146,7 @@ window.addEventListener('resize', () => {
 
 // Initial render
 // Bumped whenever a build ships so the running version is visible in-app.
-const APP_VERSION = '2026.11.06-refill-same-specs';
+const APP_VERSION = '2026.11.06-refill-from-calc';
 
 // Reloads bypassing the HTTP cache. GitHub Pages serves max-age=600 and iOS
 // standalone webapps hold on longer still, so the cache-buster is explicit.
